@@ -1,1 +1,1 @@
-include ':app', ':Camera2Lib'
+include ':app', ':camera2tool'

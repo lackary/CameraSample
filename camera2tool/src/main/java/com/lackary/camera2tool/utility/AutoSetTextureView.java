@@ -1,11 +1,8 @@
-package tw.com.hgdata.www.cameralib;
+package com.lackary.camera2tool.utility;
 
 import android.content.Context;
 import android.util.AttributeSet;
 import android.view.TextureView;
-import
-
-import java.util.IllegalFormatException;
 
 /**
  * Created by lackary on 2016/7/10.

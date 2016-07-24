@@ -1,4 +1,4 @@
-package tw.com.hgdata.www.cameralib;
+package com.lackary.camera2tool;
 
 import org.junit.Test;
 
