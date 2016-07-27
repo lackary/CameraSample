@@ -8,4 +8,5 @@
         <item name="colorAccent">@color/colorAccent</item>
     </style>
 
+    <style name="CameraFullScreenTheme" parent="android:Theme.Material.Light.NoActionBar.Fullscreen"/>
 </resources>
