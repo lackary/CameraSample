@@ -7,11 +7,14 @@ import android.content.pm.PackageManager;
 import android.graphics.Camera;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
+import android.hardware.camera2.TotalCaptureResult;
+import android.media.ImageReader;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
@@ -25,6 +28,8 @@ import android.util.Size;
 import android.view.Surface;
 import android.view.TextureView;
 
+import java.lang.reflect.Array;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -52,7 +57,7 @@ public class MainActivity extends Activity {
 
     private String  CURRENT_CAMERA_ID;
 
-    private Semaphore mCameraOpenCloseLock = new Semaphore(1);
+    private Semaphore cameraOpenCloseLock = new Semaphore(1);
 
     //camera2 class
     public CameraDevice cameraDevice;
@@ -60,6 +65,28 @@ public class MainActivity extends Activity {
     private CaptureRequest.Builder previewRequestBuilder;
 
     private CaptureRequest previewRequest;
+
+    /**
+     * Camera state: Showing camera preview.
+     */
+    private static final int STATE_PREVIEW = 0;
+
+    /**
+     * A CameraCaptureSession  for camera preview.
+     */
+    private CameraCaptureSession captureSession;
+
+    /**
+     * An ImageReader that handles still image capture.
+     */
+    private ImageReader imageReader;
+
+    /**
+     * The current state of camera state for taking pictures.
+     *
+     * @see #captureCallback
+     */
+    private int state = STATE_PREVIEW;
 
     //Camera2 API preview max size
     private int MAX_PREVIEW_WIDTH = 1920;
@@ -90,25 +117,26 @@ public class MainActivity extends Activity {
 
     };
 
-    private final CameraDevice.StateCallback stateCallback = new CameraDevice.StateCallback() {
+    private final CameraDevice.StateCallback deviceStateCallback = new CameraDevice.StateCallback() {
 
         @Override
         public void onOpened(@NonNull CameraDevice cameraDevice) {
             // This method is called when the camera is opened.  We start camera preview here.
-            mCameraOpenCloseLock.release();
+            Log.i(TAG, "onOpened " + cameraDevice);
+            cameraOpenCloseLock.release();
             createCameraPreview(cameraDevice);
         }
 
         @Override
         public void onDisconnected(@NonNull CameraDevice cameraDevice) {
-            mCameraOpenCloseLock.release();
+            cameraOpenCloseLock.release();
             cameraDevice.close();
             //mCameraDevice = null;
         }
 
         @Override
         public void onError(@NonNull CameraDevice cameraDevice, int error) {
-            mCameraOpenCloseLock.release();
+            cameraOpenCloseLock.release();
             cameraDevice.close();
             //mCameraDevice = null;
             //Activity activity = getActivity();
@@ -117,6 +145,26 @@ public class MainActivity extends Activity {
             //}
         }
 
+    };
+
+    private CameraCaptureSession.StateCallback captureSessionStateCallback = new CameraCaptureSession.StateCallback() {
+        @Override
+        public void onConfigured(CameraCaptureSession session) {
+            Log.i(TAG, "captureSessionStateCallback onConfigured");
+            captureSession = session;
+            try {
+                previewRequest = previewRequestBuilder.build();
+                captureSession.setRepeatingRequest(previewRequest, captureCallback, backgroundHandler);
+            } catch (CameraAccessException e) {
+                Log.i(TAG, "captureSessionStateCallback CameraAccessException: " + e);
+            }
+
+        }
+
+        @Override
+        public void onConfigureFailed(CameraCaptureSession session) {
+            Log.i(TAG, "captureSessionStateCallback onConfigureFailed: " + session);
+        }
     };
 
     private void requestCameraPermission() {
@@ -168,6 +216,76 @@ public class MainActivity extends Activity {
         }
     }
 
+    /**
+     * A {@link CameraCaptureSession.CaptureCallback} that handles events related to JPEG capture.
+     */
+    private CameraCaptureSession.CaptureCallback captureCallback
+            = new CameraCaptureSession.CaptureCallback() {
+
+        private void process(CaptureResult result) {
+            switch (state) {
+                case STATE_PREVIEW: {
+                    // We have nothing to do when the camera preview is working normally.
+                    break;
+                }
+                /*
+                case STATE_WAITING_LOCK: {
+                    Integer afState = result.get(CaptureResult.CONTROL_AF_STATE);
+                    if (afState == null) {
+                        captureStillPicture();
+                    } else if (CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED == afState ||
+                            CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED == afState) {
+                        // CONTROL_AE_STATE can be null on some devices
+                        Integer aeState = result.get(CaptureResult.CONTROL_AE_STATE);
+                        if (aeState == null ||
+                                aeState == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
+                            mState = STATE_PICTURE_TAKEN;
+                            captureStillPicture();
+                        } else {
+                            runPrecaptureSequence();
+                        }
+                    }
+                    break;
+                }
+                case STATE_WAITING_PRECAPTURE: {
+                    // CONTROL_AE_STATE can be null on some devices
+                    Integer aeState = result.get(CaptureResult.CONTROL_AE_STATE);
+                    if (aeState == null ||
+                            aeState == CaptureResult.CONTROL_AE_STATE_PRECAPTURE ||
+                            aeState == CaptureRequest.CONTROL_AE_STATE_FLASH_REQUIRED) {
+                        mState = STATE_WAITING_NON_PRECAPTURE;
+                    }
+                    break;
+                }
+                case STATE_WAITING_NON_PRECAPTURE: {
+                    // CONTROL_AE_STATE can be null on some devices
+                    Integer aeState = result.get(CaptureResult.CONTROL_AE_STATE);
+                    if (aeState == null || aeState != CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
+                        mState = STATE_PICTURE_TAKEN;
+                        captureStillPicture();
+                    }
+                    break;
+                }
+                */
+            }
+        }
+
+        @Override
+        public void onCaptureProgressed(@NonNull CameraCaptureSession session,
+                                        @NonNull CaptureRequest request,
+                                        @NonNull CaptureResult partialResult) {
+            process(partialResult);
+        }
+
+        @Override
+        public void onCaptureCompleted(@NonNull CameraCaptureSession session,
+                                       @NonNull CaptureRequest request,
+                                       @NonNull TotalCaptureResult result) {
+            process(result);
+        }
+
+    };
+
     private void openCamera(int width, int height) {
         Log.i(TAG, "openCamera");
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
@@ -178,12 +296,13 @@ public class MainActivity extends Activity {
         CameraManager manager = (CameraManager) this.getSystemService(Context.CAMERA_SERVICE);
 
         try {
-            if (!mCameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
+            if (!cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
                 throw new RuntimeException("Time out waiting to lock camera opening.");
             }
-            manager.openCamera(BACK_CAMERA, stateCallback, backgroundHandler);
+            manager.openCamera(BACK_CAMERA, deviceStateCallback, backgroundHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
+            Log.i(TAG, "CameraAccessException: " + e);
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted while trying to lock camera opening.", e);
         }
@@ -205,16 +324,20 @@ public class MainActivity extends Activity {
     }
 
     private void createCameraPreview(CameraDevice device) {
+        Log.i(TAG, "createCameraPreview");
         SurfaceTexture surfaceTexture = cameraTxtureVw.getSurfaceTexture();
 
         surfaceTexture.setDefaultBufferSize(1280, 720);
-
+        // This is the output Surface we need to start preview.
         Surface previewSurface = new Surface(surfaceTexture);
         try {
+            // We set up a CaptureRequest.Builder with the output Surface.
             previewRequestBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             previewRequestBuilder.addTarget(previewSurface);
-            previewRequestBuilder.build();
+            // Here, we create a CameraCaptureSession for camera preview.
+            device.createCaptureSession(Arrays.asList(previewSurface), captureSessionStateCallback, null);
         } catch (CameraAccessException e) {
+            Log.e(TAG, "createCameraPreview CameraAccessException: " + e);
             e.printStackTrace();
         }
 
@@ -262,6 +385,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+
         startBackgroundThread();
         Log.i(TAG, "cameraTxtureVw width" + cameraTxtureVw.getWidth());
         Log.i(TAG, "cameraTxtureVw height" + cameraTxtureVw.getHeight());
