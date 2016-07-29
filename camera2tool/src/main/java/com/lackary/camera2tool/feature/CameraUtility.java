@@ -55,7 +55,7 @@ public class CameraUtility {
     /**
      * CameraDevice.StateCallback is called when CameraDevice changes its state.
      */
-    private final CameraDevice.StateCallback stateCallback = new CameraDevice.StateCallback() {
+    private final CameraDevice.StateCallback deviceStateCallback = new CameraDevice.StateCallback() {
 
         @Override
         public void onOpened(CameraDevice camera) {
@@ -85,7 +85,18 @@ public class CameraUtility {
         }
     };
 
+    private CameraCaptureSession.StateCallback captureSessionStateCallback =  new CameraCaptureSession.StateCallback() {
 
+        @Override
+        public void onConfigured(CameraCaptureSession session) {
+
+        }
+
+        @Override
+        public void onConfigureFailed(CameraCaptureSession session) {
+
+        }
+    };
 
     public CameraUtility(Activity activity, Size size, TextureView textureView) {
         this.outputSize = size;
