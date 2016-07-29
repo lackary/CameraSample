@@ -23,7 +23,7 @@ import android.view.TextureView;
 /**
  * Created by lackary on 2016/7/24.
  */
-public class CameraFeature {
+public class CameraUtility {
     private final String  TAG = this.getClass().getSimpleName();
     public Size outputSize = null;
     private int outputWidth = 0;
@@ -87,7 +87,7 @@ public class CameraFeature {
 
 
 
-    public CameraFeature(Activity activity, Size size, TextureView textureView) {
+    public CameraUtility(Activity activity, Size size, TextureView textureView) {
         this.outputSize = size;
         this.cameraActivity = activity;
         this.cameraTextureView = textureView;
