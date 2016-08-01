@@ -34,12 +34,16 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+import com.lackary.camera2tool.feature.CameraUtility;
+
 public class MainActivity extends Activity {
     private final String TAG = this.getClass().getSimpleName();
 
     private static final int REQUEST_CAMERA_PERMISSION = 1;
 
     private TextureView cameraTxtureVw;
+
+    private CameraUtility cameraUtility;
 
     private Size cameraSize;
 
@@ -98,12 +102,17 @@ public class MainActivity extends Activity {
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture texture, int width, int height) {
             Log.i(TAG, "onSurfaceTextureAvailable");
+            Log.i(TAG, "width: " + width);
+            Log.i(TAG, "height: "+ height);
             openCamera(width, height);
         }
 
         @Override
         public void onSurfaceTextureSizeChanged(SurfaceTexture texture, int width, int height) {
             //configureTransform(width, height);
+            Log.i(TAG, "onSurfaceTextureSizeChanged");
+            Log.i(TAG, "width: " + width);
+            Log.i(TAG, "height: "+ height);
         }
 
         @Override
@@ -131,14 +140,14 @@ public class MainActivity extends Activity {
         public void onDisconnected(@NonNull CameraDevice cameraDevice) {
             cameraOpenCloseLock.release();
             cameraDevice.close();
-            //mCameraDevice = null;
+            cameraDevice = null;
         }
 
         @Override
         public void onError(@NonNull CameraDevice cameraDevice, int error) {
             cameraOpenCloseLock.release();
             cameraDevice.close();
-            //mCameraDevice = null;
+            cameraDevice = null;
             //Activity activity = getActivity();
             //if (null != activity) {
             //    activity.finish();
@@ -178,7 +187,7 @@ public class MainActivity extends Activity {
     }
 
     private void initCamera(){
-        CameraManager cameraManager = (CameraManager) getSystemService(CAMERA_SERVICE);
+        CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
             for(String cameraId :  cameraManager.getCameraIdList()) {
                 Log.i(TAG, "Camera Id: " + cameraId);
@@ -308,6 +317,31 @@ public class MainActivity extends Activity {
         }
     }
 
+    /**
+     * Closes the current {@link CameraDevice}.
+     */
+    private void closeCamera() {
+        try {
+            cameraOpenCloseLock.acquire();
+            if (null != captureSession) {
+                captureSession.close();
+                captureSession = null;
+            }
+            if (null != cameraDevice) {
+                cameraDevice.close();
+                cameraDevice = null;
+            }
+            /*if (null != mImageReader) {
+                mImageReader.close();
+                mImageReader = null;
+            }*/
+        } catch (InterruptedException e) {
+            throw new RuntimeException("Interrupted while trying to lock camera closing.", e);
+        } finally {
+            cameraOpenCloseLock.release();
+        }
+    }
+
     public void setCameraID(int id) {
         switch (id) {
             case FRONT_CAMERA_ID:
@@ -319,15 +353,11 @@ public class MainActivity extends Activity {
         }
     }
 
-    public String getCameraID(){
-        return CURRENT_CAMERA_ID;
-    }
-
     private void createCameraPreview(CameraDevice device) {
         Log.i(TAG, "createCameraPreview");
         SurfaceTexture surfaceTexture = cameraTxtureVw.getSurfaceTexture();
 
-        surfaceTexture.setDefaultBufferSize(1280, 720);
+        surfaceTexture.setDefaultBufferSize(cameraTxtureVw.getWidth(), cameraTxtureVw.getHeight());
         // This is the output Surface we need to start preview.
         Surface previewSurface = new Surface(surfaceTexture);
         try {
@@ -342,6 +372,12 @@ public class MainActivity extends Activity {
         }
 
     }
+
+    public String getCameraID(){
+        return CURRENT_CAMERA_ID;
+    }
+
+
 
 
     /**
@@ -376,8 +412,9 @@ public class MainActivity extends Activity {
         } else {
 
         }
-
         cameraTxtureVw = (TextureView) findViewById(R.id.camera_preview);
+
+
         initCamera();
 
     }
@@ -392,7 +429,7 @@ public class MainActivity extends Activity {
         cameraSize = new Size(cameraTxtureVw.getWidth(), cameraTxtureVw.getHeight());
         if (cameraTxtureVw.isAvailable()) {
             Log.i(TAG, "camera texture view is available ");
-            openCamera(1280, 720);
+            openCamera(cameraTxtureVw.getWidth(), cameraTxtureVw.getHeight());
         } else {
             cameraTxtureVw.setSurfaceTextureListener(surfaceTextureListener);
         }
@@ -400,6 +437,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        closeCamera();
         stopBackgroundThread();
         super.onPause();
     }

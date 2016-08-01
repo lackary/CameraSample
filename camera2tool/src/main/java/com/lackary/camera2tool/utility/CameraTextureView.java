@@ -7,24 +7,24 @@ import android.view.TextureView;
 /**
  * Created by lackary on 2016/7/10.
  */
-public class AutoSetTextureView extends TextureView {
+public class CameraTextureView extends TextureView {
 
     private int ratioWidth;
     private int ratioHeight;
 
-    public AutoSetTextureView(Context context) {
+    public CameraTextureView(Context context) {
         super(context);
     }
 
-    public AutoSetTextureView(Context context, AttributeSet attrs) {
+    public CameraTextureView(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
 
-    public AutoSetTextureView(Context context, AttributeSet attrs, int defStyleAttr) {
+    public CameraTextureView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
     }
 
-    public AutoSetTextureView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+    public CameraTextureView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
     }
 
