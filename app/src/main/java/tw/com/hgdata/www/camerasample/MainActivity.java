@@ -34,10 +34,13 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+import com.lackary.camera2tool.feature.Camera2Instant;
 import com.lackary.camera2tool.feature.CameraUtility;
 
 public class MainActivity extends Activity {
     private final String TAG = this.getClass().getSimpleName();
+
+    private Camera2Instant cameraInstant;
 
     private static final int REQUEST_CAMERA_PERMISSION = 1;
 
@@ -407,38 +410,25 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            requestCameraPermission();
-        } else {
 
-        }
         cameraTxtureVw = (TextureView) findViewById(R.id.camera_preview);
 
-
-        initCamera();
+        cameraInstant = Camera2Instant.getInstance();
+        cameraInstant.setCameraActivity(this);
+        cameraInstant.setCameraTextureView(cameraTxtureVw);
+        cameraInstant.initCamera();
 
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-
-        startBackgroundThread();
-        Log.i(TAG, "cameraTxtureVw width" + cameraTxtureVw.getWidth());
-        Log.i(TAG, "cameraTxtureVw height" + cameraTxtureVw.getHeight());
-        cameraSize = new Size(cameraTxtureVw.getWidth(), cameraTxtureVw.getHeight());
-        if (cameraTxtureVw.isAvailable()) {
-            Log.i(TAG, "camera texture view is available ");
-            openCamera(cameraTxtureVw.getWidth(), cameraTxtureVw.getHeight());
-        } else {
-            cameraTxtureVw.setSurfaceTextureListener(surfaceTextureListener);
-        }
+        cameraInstant.resumeCamera();
     }
 
     @Override
     protected void onPause() {
-        closeCamera();
-        stopBackgroundThread();
+        cameraInstant.pauseCamera();
         super.onPause();
     }
 

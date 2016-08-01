@@ -1,7 +1,9 @@
 package com.lackary.camera2tool.feature;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -13,11 +15,16 @@ import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.util.Size;
+import android.view.Surface;
 import android.view.TextureView;
 
+import java.util.Arrays;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by lackary on 2016/7/31.
@@ -31,6 +38,8 @@ public class Camera2Instant {
 
     private Activity cameraActivity;
 
+
+
     private HandlerThread backgroundThread;
 
     private Handler backgroundHandler;
@@ -41,10 +50,14 @@ public class Camera2Instant {
 
     private String currentCameraId;
 
+    private TextureView cameraTextureView;
+
+    //private CameraTextureView cameraTextureView;
+
     /**
      * The android.util.Size of camera preview.
      */
-    private Size mPreviewSize;
+    private Size previewSize;
 
     /**
      * Camera state: Showing camera preview.
@@ -64,7 +77,7 @@ public class Camera2Instant {
     /**
      * A {@link Semaphore} to prevent the app from exiting before closing the camera.
      */
-    private Semaphore mCameraOpenCloseLock = new Semaphore(1);
+    private Semaphore cameraOpenCloseLock = new Semaphore(1);
 
     /**
      * Camera2 Class
@@ -94,7 +107,7 @@ public class Camera2Instant {
      */
     private int currentState = STATE_PREVIEW;
 
-    public static Camera2Instant getInstance(Activity activity) {
+    public static Camera2Instant getInstance() {
         return ourInstance;
     }
 
@@ -177,6 +190,14 @@ public class Camera2Instant {
     private Camera2Instant() {
     }
 
+    public void setCameraActivity(Activity cameraActivity) {
+        this.cameraActivity = cameraActivity;
+    }
+
+    public void setCameraTextureView(TextureView textureView ) {
+        this.cameraTextureView = textureView;
+    }
+
     public void initCamera() {
         cameraManager = (CameraManager) cameraActivity.getSystemService(Context.CAMERA_SERVICE);
         try {
@@ -217,10 +238,115 @@ public class Camera2Instant {
     }
 
     public void openCamera(int width, int height) {
+        Log.i(TAG, "openCamera");
+        if (ContextCompat.checkSelfPermission(cameraActivity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestCameraPermission();
+            return;
+        }
 
+        CameraManager manager = (CameraManager) cameraActivity.getSystemService(Context.CAMERA_SERVICE);
+
+        try {
+            if (!cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
+                throw new RuntimeException("Time out waiting to lock camera opening.");
+            }
+            manager.openCamera(backCameraId, deviceStateCallback, backgroundHandler);
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+            Log.i(TAG, "CameraAccessException: " + e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException("Interrupted while trying to lock camera opening.", e);
+        }
     }
 
     public void closeCamera() {
+        try {
+            cameraOpenCloseLock.acquire();
+            if (null != captureSession) {
+                captureSession.close();
+                captureSession = null;
+            }
+            if (null != cameraDevice) {
+                cameraDevice.close();
+                cameraDevice = null;
+            }
+            /*if (null != mImageReader) {
+                mImageReader.close();
+                mImageReader = null;
+            }*/
+        } catch (InterruptedException e) {
+            throw new RuntimeException("Interrupted while trying to lock camera closing.", e);
+        } finally {
+            cameraOpenCloseLock.release();
+        }
+    }
 
+    public void resumeCamera() {
+        startBackgroundThread();
+        previewSize = new Size(cameraTextureView.getWidth(), cameraTextureView.getHeight());
+        if (cameraTextureView.isAvailable()) {
+            Log.i(TAG, "camera texture view is available ");
+            openCamera(cameraTextureView.getWidth(), cameraTextureView.getHeight());
+        } else {
+            cameraTextureView.setSurfaceTextureListener(surfaceTextureListener);
+        }
+    }
+
+    public void pauseCamera() {
+        closeCamera();
+        stopBackgroundThread();
+    }
+
+    private void createCameraPreview(CameraDevice device) {
+        Log.i(TAG, "createCameraPreview");
+        SurfaceTexture surfaceTexture = cameraTextureView.getSurfaceTexture();
+
+        surfaceTexture.setDefaultBufferSize(cameraTextureView.getWidth(), cameraTextureView.getHeight());
+        // This is the output Surface we need to start preview.
+        Surface previewSurface = new Surface(surfaceTexture);
+        try {
+            // We set up a CaptureRequest.Builder with the output Surface.
+            previewRequestBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            previewRequestBuilder.addTarget(previewSurface);
+            // Here, we create a CameraCaptureSession for camera preview.
+            device.createCaptureSession(Arrays.asList(previewSurface), captureSessionStateCallback, null);
+        } catch (CameraAccessException e) {
+            Log.e(TAG, "createCameraPreview CameraAccessException: " + e);
+            e.printStackTrace();
+        }
+
+    }
+
+    /**
+     * Starts a background thread and its Handler.
+     */
+    private void startBackgroundThread() {
+        backgroundThread = new HandlerThread("CameraBackground");
+        backgroundThread.start();
+        backgroundHandler = new Handler(backgroundThread.getLooper());
+    }
+
+    /**
+     * Stops the background thread and its  Handler.
+     */
+    private void stopBackgroundThread() {
+        backgroundThread.quitSafely();
+        try {
+            backgroundThread.join();
+            backgroundThread = null;
+            backgroundHandler = null;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void requestCameraPermission() {
+        if(ActivityCompat.shouldShowRequestPermissionRationale(cameraActivity, Manifest.permission.CAMERA)) {
+            //new ConfirmationDialog().show(getChildFragmentManager(), FRAGMENT_DIALOG);
+        } else {
+            //first time, AndroidManifest must set user-permission
+            ActivityCompat.requestPermissions(cameraActivity, new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA_PERMISSION);
+            Log.v(TAG, "requestPermissions");
+        }
     }
 }
