@@ -84,6 +84,7 @@ public class Camera2Instant {
      */
     private CameraManager cameraManager;
     private CameraDevice cameraDevice;
+    private CameraDevice currentCameraDevice;
 
     /**
      * A CameraCaptureSession  for camera preview.
@@ -149,9 +150,10 @@ public class Camera2Instant {
         @Override
         public void onOpened(CameraDevice camera) {
             // This method is called when the camera is opened.  We start camera preview here.
-            Log.i(TAG, "onOpened " + cameraDevice);
+            Log.i(TAG, "onOpened " + camera);
             cameraOpenCloseLock.release();
-            createCameraPreview(cameraDevice);
+            currentCameraDevice = camera;
+            createCameraPreview(currentCameraDevice);
         }
 
         @Override
@@ -163,6 +165,7 @@ public class Camera2Instant {
 
         @Override
         public void onError(CameraDevice camera, int error) {
+            Log.i(TAG, "onError " + camera + " error " + error);
             cameraOpenCloseLock.release();
             cameraDevice.close();
             cameraDevice = null;
@@ -240,12 +243,19 @@ public class Camera2Instant {
 
         @Override
         public void onConfigured(CameraCaptureSession session) {
-
+            Log.i(TAG, "captureSessionStateCallback onConfigured");
+            captureSession = session;
+            try {
+                previewRequest = previewRequestBuilder.build();
+                captureSession.setRepeatingRequest(previewRequest, captureCallback, backgroundHandler);
+            } catch (CameraAccessException e) {
+                Log.i(TAG, "captureSessionStateCallback CameraAccessException: " + e);
+            }
         }
 
         @Override
         public void onConfigureFailed(CameraCaptureSession session) {
-
+            Log.i(TAG, "captureSessionStateCallback onConfigureFailed: " + session);
         }
     };
 

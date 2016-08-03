@@ -417,6 +417,7 @@ public class MainActivity extends Activity {
         cameraInstant.setCameraActivity(this);
         cameraInstant.setCameraTextureView(cameraTxtureVw);
         cameraInstant.initCamera();
+        initCamera();
 
     }
 
@@ -424,6 +425,16 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         cameraInstant.resumeCamera();
+        /*
+        startBackgroundThread();
+        cameraSize = new Size(cameraTxtureVw.getWidth(), cameraTxtureVw.getHeight());
+        if (cameraTxtureVw.isAvailable()) {
+            Log.i(TAG, "camera texture view is available ");
+            openCamera(cameraTxtureVw.getWidth(), cameraTxtureVw.getHeight());
+        } else {
+            cameraTxtureVw.setSurfaceTextureListener(surfaceTextureListener);
+        }
+        */
     }
 
     @Override
