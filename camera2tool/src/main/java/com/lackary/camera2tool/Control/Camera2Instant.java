@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
+import android.graphics.Point;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -36,11 +37,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -121,7 +124,7 @@ public class Camera2Instant {
      */
     private static final int MAX_PREVIEW_HEIGHT = 1080;
 
-    private static Size largestPircture;
+    private Size largestPic;
 
     /**
      * Orientation of the camera sensor
@@ -139,6 +142,8 @@ public class Camera2Instant {
     private CameraManager cameraManager;
     private CameraDevice cameraDevice;
     private CameraDevice currentCameraDevice;
+
+    private CameraCharacteristics cameraCharacteristics;
 
     /**
      * A CameraCaptureSession  for camera preview.
@@ -184,6 +189,111 @@ public class Camera2Instant {
 
     public static Camera2Instant getInstance() {
         return ourInstance;
+    }
+
+    /**
+     * Given {@code choices} of {@code Size}s supported by a camera, choose the smallest one that
+     * is at least as large as the respective texture view size, and that is at most as large as the
+     * respective max size, and whose aspect ratio matches with the specified value. If such size
+     * doesn't exist, choose the largest one that is at most as large as the respective max size,
+     * and whose aspect ratio matches with the specified value.
+     *
+     * @param choices           The list of sizes that the camera supports for the intended output
+     *                          class
+     * @param textureViewWidth  The width of the texture view relative to sensor coordinate
+     * @param textureViewHeight The height of the texture view relative to sensor coordinate
+     * @param maxWidth          The maximum width that can be chosen
+     * @param maxHeight         The maximum height that can be chosen
+     * @param aspectRatio       The aspect ratio
+     * @return The optimal {@code Size}, or an arbitrary one if none were big enough
+     */
+    private Size chooseOptimalSize(Size[] choices, int textureViewWidth,
+                                   int textureViewHeight, int maxWidth, int maxHeight, Size aspectRatio) {
+
+        // Collect the supported resolutions that are at least as big as the preview Surface
+        List<Size> bigEnough = new ArrayList<>();
+        // Collect the supported resolutions that are smaller than the preview Surface
+        List<Size> notBigEnough = new ArrayList<>();
+        int w = aspectRatio.getWidth();
+        int h = aspectRatio.getHeight();
+        for (Size option : choices) {
+            if (option.getWidth() <= maxWidth && option.getHeight() <= maxHeight &&
+                    option.getHeight() == option.getWidth() * h / w) {
+                if (option.getWidth() >= textureViewWidth &&
+                        option.getHeight() >= textureViewHeight) {
+                    bigEnough.add(option);
+                } else {
+                    notBigEnough.add(option);
+                }
+            }
+        }
+
+        // Pick the smallest of those big enough. If there is no one big enough, pick the
+        // largest of those not big enough.
+        if (bigEnough.size() > 0) {
+            return Collections.min(bigEnough, new CompareSizesByArea());
+        } else if (notBigEnough.size() > 0) {
+            return Collections.max(notBigEnough, new CompareSizesByArea());
+        } else {
+            Log.i(TAG, "Couldn't find any suitable preview size");
+            return choices[0];
+        }
+    }
+
+    private void setUpCameraPreview(int width, int height) {
+
+        // Find out if we need to swap dimension to get the preview size relative to sensor
+        // coordinate.
+        int displayRotation = cameraActivity.getWindowManager().getDefaultDisplay().getRotation();
+        //noinspection ConstantConditions
+        sensorOrientation = cameraCharacteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+        boolean swappedDimensions = false;
+        switch (displayRotation) {
+            case Surface.ROTATION_0:
+            case Surface.ROTATION_180:
+                if (sensorOrientation == 90 || sensorOrientation == 270) {
+                    swappedDimensions = true;
+                }
+                break;
+            case Surface.ROTATION_90:
+            case Surface.ROTATION_270:
+                if (sensorOrientation == 0 || sensorOrientation == 180) {
+                    swappedDimensions = true;
+                }
+                break;
+            default:
+                Log.e(TAG, "Display rotation is invalid: " + displayRotation);
+        }
+
+        Point displaySize = new Point();
+        cameraActivity.getWindowManager().getDefaultDisplay().getSize(displaySize);
+        int rotatedPreviewWidth = width;
+        int rotatedPreviewHeight = height;
+        int maxPreviewWidth = displaySize.x;
+        int maxPreviewHeight = displaySize.y;
+
+        if (swappedDimensions) {
+            rotatedPreviewWidth = height;
+            rotatedPreviewHeight = width;
+            maxPreviewWidth = displaySize.y;
+            maxPreviewHeight = displaySize.x;
+        }
+
+        if (maxPreviewWidth > MAX_PREVIEW_WIDTH) {
+            maxPreviewWidth = MAX_PREVIEW_WIDTH;
+        }
+
+        if (maxPreviewHeight > MAX_PREVIEW_HEIGHT) {
+            maxPreviewHeight = MAX_PREVIEW_HEIGHT;
+        }
+
+        // Danger, W.R.! Attempting to use too large a preview size could  exceed the camera
+        // bus' bandwidth limitation, resulting in  previews but the storage of
+        // garbage capture data.
+        previewSize = chooseOptimalSize(streamConfigurationMap.getOutputSizes(SurfaceTexture.class),
+                rotatedPreviewWidth, rotatedPreviewHeight, maxPreviewWidth,
+                maxPreviewHeight, largestPic);
+
     }
 
     private final TextureView.SurfaceTextureListener surfaceTextureListener
@@ -275,6 +385,9 @@ public class Camera2Instant {
                             Log.i(TAG, "runPrecaptureSequence");
                             //runPrecaptureSequence();
                         }
+                    } else {
+                        Log.i(TAG, "afState was not support");
+                        captureStillPicture();
                     }
                     break;
                 }
@@ -407,10 +520,10 @@ public class Camera2Instant {
                 streamConfigurationMap = cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
 
                 // For still image captures, we use the largest available size.
-                Size largest = Collections.max(
+                largestPic = Collections.max(
                         Arrays.asList(streamConfigurationMap.getOutputSizes(ImageFormat.JPEG)),
                         new CompareSizesByArea());
-                imageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
+                imageReader = ImageReader.newInstance(largestPic.getWidth(), largestPic.getHeight(),
                         ImageFormat.JPEG, /*maxImages*/1);
                 imageReader.setOnImageAvailableListener(
                         imageAvailableListener, backgroundHandler);
@@ -454,6 +567,8 @@ public class Camera2Instant {
             requestCameraPermission();
             return;
         }
+
+        setUpCameraPreview(width, height);
 
         cameraManager = (CameraManager) cameraActivity.getSystemService(Context.CAMERA_SERVICE);
 
@@ -512,17 +627,13 @@ public class Camera2Instant {
     private CameraFeature getCameraAbility(String id) {
         cameraFeature = new CameraFeature();
         try {
-            CameraCharacteristics cameraCharacteristics = cameraManager.getCameraCharacteristics(id);
+            cameraCharacteristics = cameraManager.getCameraCharacteristics(id);
             cameraFeature.setCameraId(id);
 
-            //set picture size
-            streamConfigurationMap = cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             //Log.i(TAG, "streamConfigurationMap: " + streamConfigurationMap);
             cameraFeature.setJEPGFormatSizes(streamConfigurationMap.getOutputSizes(ImageFormat.JPEG));
             // For still image captures, we use the largest available size.
-            cameraFeature.setLargestPicture(Collections.max(
-                    Arrays.asList(streamConfigurationMap.getOutputSizes(ImageFormat.JPEG)),
-                    new CompareSizesByArea()));
+            cameraFeature.setLargestPicture(largestPic);
 
             //int deviceLevel = cameraCharacteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
             //Log.i(TAG, "deviceLevel: " + deviceLevel);
@@ -577,25 +688,24 @@ public class Camera2Instant {
         }
         if (ContextCompat.checkSelfPermission(cameraActivity, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             requestWriteExternalStoragePremission();
-        } else {
-            File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
-            //File dir = this.cameraActivity.getExternalFilesDir(Environment.DIRECTORY_DCIM);
-            Log.i(TAG, "Environment dir: " + dir.getPath());
-            Log.i(TAG, "Environment dir: " + dir.getAbsolutePath());
-            Log.i(TAG, "Environment dir: " + dir.getName());
-            File pictureDir = new File(dir.getPath() + "/"+ foldar);
-            //this.pictureDir = dir;
-            if(!pictureDir.exists()) {
-                Log.i(TAG, "This dir is not exist");
-                if(!pictureDir.mkdir()) {
-                    Log.i(TAG, "this dir did not mkdir ");
-                }
-                Log.i(TAG, "picture dir: " + pictureDir.getPath());
-                Log.i(TAG, "picture dir: " + pictureDir.getAbsolutePath());
-                Log.i(TAG, "picture dir: " + pictureDir.getName());
-            }
-            this.pictureDir = pictureDir;
         }
+        File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
+        //File dir = this.cameraActivity.getExternalFilesDir(Environment.DIRECTORY_DCIM);
+        Log.i(TAG, "Environment dir: " + dir.getPath());
+        Log.i(TAG, "Environment dir: " + dir.getAbsolutePath());
+        Log.i(TAG, "Environment dir: " + dir.getName());
+        File pictureDir = new File(dir.getPath() + "/"+ foldar);
+        //this.pictureDir = dir;
+        if(!pictureDir.exists()) {
+            Log.i(TAG, "This dir is not exist");
+            if(!pictureDir.mkdir()) {
+                Log.i(TAG, "this dir did not mkdir ");
+            }
+            Log.i(TAG, "picture dir: " + pictureDir.getPath());
+            Log.i(TAG, "picture dir: " + pictureDir.getAbsolutePath());
+            Log.i(TAG, "picture dir: " + pictureDir.getName());
+        }
+        this.pictureDir = pictureDir;
 
     }
 
@@ -642,7 +752,7 @@ public class Camera2Instant {
         Log.i(TAG, "createCameraPreview");
         SurfaceTexture surfaceTexture = cameraTextureView.getSurfaceTexture();
 
-        surfaceTexture.setDefaultBufferSize(cameraTextureView.getWidth(), cameraTextureView.getHeight());
+        surfaceTexture.setDefaultBufferSize(previewSize.getWidth(), previewSize.getHeight());
         // This is the output Surface we need to start preview.
         Surface previewSurface = new Surface(surfaceTexture);
         try {
