@@ -65,7 +65,7 @@ public class MainActivity extends Activity implements SensorEventListener2,  Vie
         //private path /storage/...
         //cameraInstant.setPicturePath(getExternalFilesDir(Environment.DIRECTORY_PICTURES));
         cameraInstant.setPicturePath("FullCamera");
-        cameraInstant.initCamera(CameraCharacteristics.LENS_FACING_FRONT);
+        cameraInstant.initCamera(CameraCharacteristics.LENS_FACING_BACK);
 
         sensorManager = (SensorManager) getSystemService(Activity.SENSOR_SERVICE);
 

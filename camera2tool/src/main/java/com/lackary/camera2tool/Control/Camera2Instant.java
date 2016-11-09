@@ -13,6 +13,7 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
+import android.hardware.camera2.CaptureFailure;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
@@ -140,7 +141,6 @@ public class Camera2Instant {
      * Camera2 Class
      */
     private CameraManager cameraManager;
-    private CameraDevice cameraDevice;
     private CameraDevice currentCameraDevice;
 
     private CameraCharacteristics cameraCharacteristics;
@@ -170,74 +170,30 @@ public class Camera2Instant {
     private CaptureRequest previewRequest;
 
     private File pictureDir;
-    /**
-     * The current state of camera state for taking pictures.
-     *
-     * @see #captureCallback
-     */
-
 
     /**
-     * the streamConfiguration of Camera  Devivce
+     * the streamConfiguration of Camera Device
      */
 
-    StreamConfigurationMap streamConfigurationMap;
+    private StreamConfigurationMap streamConfigurationMap;
 
     private int currentState = STATE_PREVIEW;
 
     public CameraFeature cameraFeature;
 
+    public static ImageListener imageListener;
+
     public static Camera2Instant getInstance() {
         return ourInstance;
     }
 
-    /**
-     * Given {@code choices} of {@code Size}s supported by a camera, choose the smallest one that
-     * is at least as large as the respective texture view size, and that is at most as large as the
-     * respective max size, and whose aspect ratio matches with the specified value. If such size
-     * doesn't exist, choose the largest one that is at most as large as the respective max size,
-     * and whose aspect ratio matches with the specified value.
-     *
-     * @param choices           The list of sizes that the camera supports for the intended output
-     *                          class
-     * @param textureViewWidth  The width of the texture view relative to sensor coordinate
-     * @param textureViewHeight The height of the texture view relative to sensor coordinate
-     * @param maxWidth          The maximum width that can be chosen
-     * @param maxHeight         The maximum height that can be chosen
-     * @param aspectRatio       The aspect ratio
-     * @return The optimal {@code Size}, or an arbitrary one if none were big enough
-     */
-    private Size chooseOptimalSize(Size[] choices, int textureViewWidth,
-                                   int textureViewHeight, int maxWidth, int maxHeight, Size aspectRatio) {
+    private Camera2Instant() {
+    }
 
-        // Collect the supported resolutions that are at least as big as the preview Surface
-        List<Size> bigEnough = new ArrayList<>();
-        // Collect the supported resolutions that are smaller than the preview Surface
-        List<Size> notBigEnough = new ArrayList<>();
-        int w = aspectRatio.getWidth();
-        int h = aspectRatio.getHeight();
-        for (Size option : choices) {
-            if (option.getWidth() <= maxWidth && option.getHeight() <= maxHeight &&
-                    option.getHeight() == option.getWidth() * h / w) {
-                if (option.getWidth() >= textureViewWidth &&
-                        option.getHeight() >= textureViewHeight) {
-                    bigEnough.add(option);
-                } else {
-                    notBigEnough.add(option);
-                }
-            }
-        }
+    //public interface
 
-        // Pick the smallest of those big enough. If there is no one big enough, pick the
-        // largest of those not big enough.
-        if (bigEnough.size() > 0) {
-            return Collections.min(bigEnough, new CompareSizesByArea());
-        } else if (notBigEnough.size() > 0) {
-            return Collections.max(notBigEnough, new CompareSizesByArea());
-        } else {
-            Log.i(TAG, "Couldn't find any suitable preview size");
-            return choices[0];
-        }
+    public interface ImageListener {
+        void onImageByte(byte[] bytes);
     }
 
     private void setUpCameraPreview(int width, int height) {
@@ -342,16 +298,19 @@ public class Camera2Instant {
         @Override
         public void onDisconnected(CameraDevice camera) {
             cameraOpenCloseLock.release();
-            cameraDevice.close();
-            cameraDevice = null;
+            currentCameraDevice.close();
+            currentCameraDevice = null;
         }
 
         @Override
         public void onError(CameraDevice camera, int error) {
             Log.i(TAG, "onError " + camera + " error " + error);
             cameraOpenCloseLock.release();
-            cameraDevice.close();
-            cameraDevice = null;
+            currentCameraDevice.close();
+            currentCameraDevice = null;
+            if (cameraActivity != null) {
+                cameraActivity.finish();
+            }
             //Activity activity = getActivity();
             //if (null != activity) {
             //    activity.finish();
@@ -359,7 +318,7 @@ public class Camera2Instant {
         }
     };
 
-    private CameraCaptureSession.CaptureCallback captureCallback = new CameraCaptureSession.CaptureCallback() {
+    private CameraCaptureSession.CaptureCallback capturePreviewCallback = new CameraCaptureSession.CaptureCallback() {
 
         private void process(CaptureResult result) {
             switch (currentState) {
@@ -372,9 +331,11 @@ public class Camera2Instant {
                     Log.i(TAG, "STATE_WAITING_LOCK");
                     Integer afState = result.get(CaptureResult.CONTROL_AF_STATE);
                     if (afState == null) {
+                        Log.i(TAG, "afState was null");
                         captureStillPicture();
                     } else if (CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED == afState ||
                             CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED == afState) {
+                        Log.i(TAG, "afState was af focused or not focused");
                         // CONTROL_AE_STATE can be null on some devices
                         Integer aeState = result.get(CaptureResult.CONTROL_AE_STATE);
                         if (aeState == null ||
@@ -385,9 +346,12 @@ public class Camera2Instant {
                             Log.i(TAG, "runPrecaptureSequence");
                             //runPrecaptureSequence();
                         }
-                    } else {
-                        Log.i(TAG, "afState was not support");
+                    } else if (CaptureResult.CONTROL_AF_MODE_OFF == afState){
+                        Log.i(TAG, "afState was off: " + afState);
+                        currentState = STATE_PICTURE_TAKEN;
                         captureStillPicture();
+                    } else{
+                        Log.i(TAG, "afState was unknown: " + afState);
                     }
                     break;
                 }
@@ -432,15 +396,58 @@ public class Camera2Instant {
         }
     };
 
+    private CameraCaptureSession.CaptureCallback captureStillCallback = new CameraCaptureSession.CaptureCallback() {
+        @Override
+        public void onCaptureStarted(CameraCaptureSession session, CaptureRequest request, long timestamp, long frameNumber) {
+            super.onCaptureStarted(session, request, timestamp, frameNumber);
+        }
+
+        @Override
+        public void onCaptureProgressed(CameraCaptureSession session, CaptureRequest request, CaptureResult partialResult) {
+            super.onCaptureProgressed(session, request, partialResult);
+        }
+
+        @Override
+        public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
+            super.onCaptureCompleted(session, request, result);
+            //showToast("Saved: " + mFile);
+            Log.d(TAG, "still Capture completed");
+            unlockFocus();
+        }
+
+        @Override
+        public void onCaptureFailed(CameraCaptureSession session, CaptureRequest request, CaptureFailure failure) {
+            super.onCaptureFailed(session, request, failure);
+        }
+
+        @Override
+        public void onCaptureSequenceCompleted(CameraCaptureSession session, int sequenceId, long frameNumber) {
+            super.onCaptureSequenceCompleted(session, sequenceId, frameNumber);
+        }
+
+        @Override
+        public void onCaptureSequenceAborted(CameraCaptureSession session, int sequenceId) {
+            super.onCaptureSequenceAborted(session, sequenceId);
+        }
+
+        @Override
+        public void onCaptureBufferLost(CameraCaptureSession session, CaptureRequest request, Surface target, long frameNumber) {
+            super.onCaptureBufferLost(session, request, target, frameNumber);
+        }
+    };
+
     private CameraCaptureSession.StateCallback captureSessionStateCallback =  new CameraCaptureSession.StateCallback() {
 
         @Override
         public void onConfigured(CameraCaptureSession session) {
             Log.i(TAG, "captureSessionStateCallback onConfigured");
+            if (currentCameraDevice == null) {
+                return;
+            }
             captureSession = session;
             try {
                 previewRequest = previewRequestBuilder.build();
-                captureSession.setRepeatingRequest(previewRequest, captureCallback, backgroundHandler);
+                captureSession.setRepeatingRequest(previewRequest, capturePreviewCallback, backgroundHandler);
             } catch (CameraAccessException e) {
                 Log.i(TAG, "captureSessionStateCallback CameraAccessException: " + e);
             }
@@ -475,9 +482,6 @@ public class Camera2Instant {
         }
 
     };
-
-    private Camera2Instant() {
-    }
 
     public void setCameraActivity(Activity cameraActivity) {
         this.cameraActivity = cameraActivity;
@@ -523,10 +527,12 @@ public class Camera2Instant {
                 largestPic = Collections.max(
                         Arrays.asList(streamConfigurationMap.getOutputSizes(ImageFormat.JPEG)),
                         new CompareSizesByArea());
-                imageReader = ImageReader.newInstance(largestPic.getWidth(), largestPic.getHeight(),
-                        ImageFormat.JPEG, /*maxImages*/1);
-                imageReader.setOnImageAvailableListener(
-                        imageAvailableListener, backgroundHandler);
+
+                //imageReader = ImageReader.newInstance(largestPic.getWidth(), largestPic.getHeight(),
+                //       ImageFormat.JPEG, /*maxImages*/1);
+                //imageReader.setOnImageAvailableListener(
+                //        imageAvailableListener, backgroundHandler);
+
 
                 getCameraAbility(cameraId);
 
@@ -543,17 +549,6 @@ public class Camera2Instant {
                 }
 
                 */
-                //List<CaptureRequest.Key<?>> captureRequestKeys = cameraCharacteristics.getAvailableCaptureRequestKeys();
-                //Log.i(TAG, "captureRequestKeys" + captureRequestKeys.toString());
-                //List<CaptureResult.Key<?>> captureResultKeys = cameraCharacteristics.getAvailableCaptureResultKeys();
-                //Log.i(TAG, "captureResultKeys:" + captureResultKeys.toString());
-                //List<CameraCharacteristics.Key<?>> cameraCharacteristicsKeys = cameraCharacteristics.getKeys();
-                //Log.i(TAG, "cameraCharacteristicsKeys: " +cameraCharacteristicsKeys.toString());
-
-                //int[] modes = cameraCharacteristics.get(CameraCharacteristics.COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES);
-                //for(int i : modes) {
-                //Log.i(TAG, "mode: " + i);
-                //}
             }
 
         } catch (CameraAccessException e) {
@@ -592,14 +587,14 @@ public class Camera2Instant {
                 captureSession.close();
                 captureSession = null;
             }
-            if (null != cameraDevice) {
-                cameraDevice.close();
-                cameraDevice = null;
+            if (null != currentCameraDevice) {
+                currentCameraDevice.close();
+                currentCameraDevice = null;
             }
-            /*if (null != mImageReader) {
-                mImageReader.close();
-                mImageReader = null;
-            }*/
+            if (null != imageReader) {
+                imageReader.close();
+                imageReader = null;
+            }
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted while trying to lock camera closing.", e);
         } finally {
@@ -609,6 +604,10 @@ public class Camera2Instant {
 
     public void resumeCamera() {
         startBackgroundThread();
+        imageReader = ImageReader.newInstance(largestPic.getWidth(), largestPic.getHeight(),
+                ImageFormat.JPEG, /*maxImages*/1);
+        imageReader.setOnImageAvailableListener(
+                imageAvailableListener, backgroundHandler);
         previewSize = new Size(cameraTextureView.getWidth(), cameraTextureView.getHeight());
         if (cameraTextureView.isAvailable()) {
             Log.i(TAG, "camera texture view was not available ");
@@ -622,6 +621,55 @@ public class Camera2Instant {
     public void pauseCamera() {
         closeCamera();
         stopBackgroundThread();
+    }
+
+    /**
+     * Given {@code choices} of {@code Size}s supported by a camera, choose the smallest one that
+     * is at least as large as the respective texture view size, and that is at most as large as the
+     * respective max size, and whose aspect ratio matches with the specified value. If such size
+     * doesn't exist, choose the largest one that is at most as large as the respective max size,
+     * and whose aspect ratio matches with the specified value.
+     *
+     * @param choices           The list of sizes that the camera supports for the intended output
+     *                          class
+     * @param textureViewWidth  The width of the texture view relative to sensor coordinate
+     * @param textureViewHeight The height of the texture view relative to sensor coordinate
+     * @param maxWidth          The maximum width that can be chosen
+     * @param maxHeight         The maximum height that can be chosen
+     * @param aspectRatio       The aspect ratio
+     * @return The optimal {@code Size}, or an arbitrary one if none were big enough
+     */
+    private Size chooseOptimalSize(Size[] choices, int textureViewWidth,
+                                   int textureViewHeight, int maxWidth, int maxHeight, Size aspectRatio) {
+
+        // Collect the supported resolutions that are at least as big as the preview Surface
+        List<Size> bigEnough = new ArrayList<>();
+        // Collect the supported resolutions that are smaller than the preview Surface
+        List<Size> notBigEnough = new ArrayList<>();
+        int w = aspectRatio.getWidth();
+        int h = aspectRatio.getHeight();
+        for (Size option : choices) {
+            if (option.getWidth() <= maxWidth && option.getHeight() <= maxHeight &&
+                    option.getHeight() == option.getWidth() * h / w) {
+                if (option.getWidth() >= textureViewWidth &&
+                        option.getHeight() >= textureViewHeight) {
+                    bigEnough.add(option);
+                } else {
+                    notBigEnough.add(option);
+                }
+            }
+        }
+
+        // Pick the smallest of those big enough. If there is no one big enough, pick the
+        // largest of those not big enough.
+        if (bigEnough.size() > 0) {
+            return Collections.min(bigEnough, new CompareSizesByArea());
+        } else if (notBigEnough.size() > 0) {
+            return Collections.max(notBigEnough, new CompareSizesByArea());
+        } else {
+            Log.i(TAG, "Couldn't find any suitable preview size");
+            return choices[0];
+        }
     }
 
     private CameraFeature getCameraAbility(String id) {
@@ -768,6 +816,10 @@ public class Camera2Instant {
 
     }
 
+    public void setListener(ImageListener listener) {
+        imageListener = listener;
+    }
+
     /**
      * Starts a background thread and its Handler.
      */
@@ -823,7 +875,7 @@ public class Camera2Instant {
                     CameraMetadata.CONTROL_AF_TRIGGER_START);
             // Tell #mCaptureCallback to wait for the lock.
             currentState = STATE_WAITING_LOCK;
-            captureSession.capture(previewRequestBuilder.build(), captureCallback,
+            captureSession.capture(previewRequestBuilder.build(), capturePreviewCallback,
                     backgroundHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
@@ -840,11 +892,11 @@ public class Camera2Instant {
             previewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
                     CameraMetadata.CONTROL_AF_TRIGGER_CANCEL);
             setAutoFlash(previewRequestBuilder);
-            captureSession.capture(previewRequestBuilder.build(), captureCallback,
+            captureSession.capture(previewRequestBuilder.build(), capturePreviewCallback,
                     backgroundHandler);
             // After this, the camera will go back to the normal state of preview.
             currentState = STATE_PREVIEW;
-            captureSession.setRepeatingRequest(previewRequest, captureCallback,
+            captureSession.setRepeatingRequest(previewRequest, capturePreviewCallback,
                     backgroundHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
@@ -867,7 +919,7 @@ public class Camera2Instant {
             // Use the same AE and AF modes as the preview.
             stillCaptureRequstBuilder.set(CaptureRequest.CONTROL_AF_MODE,
                     CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-
+            /*
             CameraCaptureSession.CaptureCallback stillCaptureCallback
                     = new CameraCaptureSession.CaptureCallback() {
 
@@ -880,9 +932,9 @@ public class Camera2Instant {
                     unlockFocus();
                 }
             };
-
+            */
             captureSession.stopRepeating();
-            captureSession.capture(stillCaptureRequstBuilder.build(), stillCaptureCallback, null);
+            captureSession.capture(stillCaptureRequstBuilder.build(), captureStillCallback, null);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -950,6 +1002,7 @@ public class Camera2Instant {
             try {
                 output = new FileOutputStream(file);
                 output.write(bytes);
+                imageListener.onImageByte(bytes);
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
