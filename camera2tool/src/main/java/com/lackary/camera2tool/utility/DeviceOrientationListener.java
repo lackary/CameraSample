@@ -2,6 +2,7 @@ package com.lackary.camera2tool.utility;
 
 import android.content.Context;
 import android.content.res.Configuration;
+import android.util.Log;
 import android.view.OrientationEventListener;
 import android.view.Surface;
 import android.view.WindowManager;
@@ -13,38 +14,53 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 
 public abstract class DeviceOrientationListener extends OrientationEventListener {
+    private final String TAG = this.getClass().getSimpleName();
 
     public static final int CONFIGURATION_ORIENTATION_UNDEFINED = Configuration.ORIENTATION_UNDEFINED;
-    private volatile int defaultScreenOrientation = CONFIGURATION_ORIENTATION_UNDEFINED;
     public int prevOrientation = OrientationEventListener.ORIENTATION_UNKNOWN;
-    private Context ctx;
+    private Context context;
     private ReentrantLock lock = new ReentrantLock(true);
+    private volatile int defaultScreenOrientation = CONFIGURATION_ORIENTATION_UNDEFINED;
+
+    private final int ORIENTATION_0 = 0;
+    private final int ORIENTATION_90 = 90;
+    private final int ORIENTATION_180 = 180;
+    private final int ORIENTATION_270 = 270;
+
+    private int oldOrientation = -1;
 
     public DeviceOrientationListener(Context context) {
         super(context);
+        this.context = context;
     }
 
     public DeviceOrientationListener(Context context, int rate) {
         super(context, rate);
+        this.context = context;
     }
 
     @Override
     public void onOrientationChanged(final int orientation) {
         int currentOrientation = OrientationEventListener.ORIENTATION_UNKNOWN;
         if (orientation >= 330 || orientation < 30) {
-            currentOrientation = Surface.ROTATION_0;
+            currentOrientation = ORIENTATION_0;
         } else if (orientation >= 60 && orientation < 120) {
-            currentOrientation = Surface.ROTATION_90;
+            currentOrientation = ORIENTATION_90;
         } else if (orientation >= 150 && orientation < 210) {
-            currentOrientation = Surface.ROTATION_180;
+            currentOrientation = ORIENTATION_180;
         } else if (orientation >= 240 && orientation < 300) {
-            currentOrientation = Surface.ROTATION_270;
+            currentOrientation = ORIENTATION_270;
+        } else {
+            currentOrientation = oldOrientation;
         }
 
         if (prevOrientation != currentOrientation && orientation != OrientationEventListener.ORIENTATION_UNKNOWN) {
             prevOrientation = currentOrientation;
             if (currentOrientation != OrientationEventListener.ORIENTATION_UNKNOWN)
-                reportOrientationChanged(currentOrientation);
+                //reportOrientationChanged(currentOrientation);
+                //Log.i(TAG, "defaultOrientation:" + getDeviceDefaultOrientation());
+                onDeviceOrientationChanged(currentOrientation);
+                oldOrientation = currentOrientation;
         }
 
     }
@@ -52,6 +68,8 @@ public abstract class DeviceOrientationListener extends OrientationEventListener
     private void reportOrientationChanged(final int currentOrientation) {
 
         int defaultOrientation = getDeviceDefaultOrientation();
+        Log.i(TAG, "defaultOrientation" + defaultOrientation);
+
         int orthogonalOrientation = defaultOrientation == Configuration.ORIENTATION_LANDSCAPE ? Configuration.ORIENTATION_PORTRAIT
                 : Configuration.ORIENTATION_LANDSCAPE;
 
@@ -73,7 +91,7 @@ public abstract class DeviceOrientationListener extends OrientationEventListener
     private int getDeviceDefaultOrientation() {
         if (defaultScreenOrientation == CONFIGURATION_ORIENTATION_UNDEFINED) {
             lock.lock();
-            defaultScreenOrientation = initDeviceDefaultOrientation(ctx);
+            defaultScreenOrientation = initDeviceDefaultOrientation(context);
             lock.unlock();
         }
         return defaultScreenOrientation;

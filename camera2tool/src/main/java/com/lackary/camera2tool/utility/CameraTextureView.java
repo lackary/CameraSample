@@ -33,7 +33,7 @@ public class CameraTextureView extends TextureView {
      * @param width
      * @param height
      */
-    public void SetAspectRatio(int width, int height) {
+    public void setAspectRatio(int width, int height) {
 
         if (width < 0 || height < 0) {
             throw new IllegalArgumentException("Size cannot be negative.");
@@ -52,7 +52,7 @@ public class CameraTextureView extends TextureView {
         int width = widthMeasureSpec;
         int height = heightMeasureSpec;
 
-        if (widthMeasureSpec == 0 || heightMeasureSpec == 0) {
+        if (ratioWidth == 0 || ratioHeight == 0) {
             setMeasuredDimension(width, height);
         } else  {
             if (width < height * ratioWidth / ratioHeight) {

@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.ImageFormat;
 import android.graphics.Point;
 import android.graphics.SurfaceTexture;
@@ -30,8 +31,11 @@ import android.util.Log;
 import android.util.Range;
 import android.util.Rational;
 import android.util.Size;
+import android.util.SparseIntArray;
 import android.view.Surface;
 import android.view.TextureView;
+
+import com.lackary.camera2tool.utility.CameraTextureView;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -74,11 +78,23 @@ public class Camera2Instant {
 
 
     /**
+     * Conversion from screen rotation to JPEG orientation.
+     */
+    private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
+
+    static {
+        ORIENTATIONS.append(Surface.ROTATION_0, 90);
+        ORIENTATIONS.append(Surface.ROTATION_90, 0);
+        ORIENTATIONS.append(Surface.ROTATION_180, 270);
+        ORIENTATIONS.append(Surface.ROTATION_270, 180);
+    }
+
+    /**
      * A Textureview that handles preview
      */
-    private TextureView cameraTextureView;
+    //private TextureView cameraTextureView;
 
-    //private CameraTextureView cameraTextureView;
+    private CameraTextureView cameraTextureView;
 
     /**
      * An ImageReader that handles still image capture.
@@ -133,6 +149,11 @@ public class Camera2Instant {
     private int sensorOrientation;
 
     /**
+     * Orientation of the device sensor
+     */
+    private int deviceOrientation;
+
+    /**
      * A {@link Semaphore} to prevent the app from exiting before closing the camera.
      */
     private Semaphore cameraOpenCloseLock = new Semaphore(1);
@@ -157,7 +178,7 @@ public class Camera2Instant {
     /**
      * CaptureRequest.Builder for the camera still
      */
-    private CaptureRequest.Builder stillCaptureRequstBuilder;
+    private CaptureRequest.Builder stillCaptureRequestBuilder;
 
     /**
      * CaptureRequest.Builder for the camera record
@@ -249,6 +270,16 @@ public class Camera2Instant {
         previewSize = chooseOptimalSize(streamConfigurationMap.getOutputSizes(SurfaceTexture.class),
                 rotatedPreviewWidth, rotatedPreviewHeight, maxPreviewWidth,
                 maxPreviewHeight, largestPic);
+
+        // We fit the aspect ratio of TextureView to the size of preview we picked.
+        int orientation = cameraActivity.getResources().getConfiguration().orientation;
+        if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            cameraTextureView.setAspectRatio(
+                    previewSize.getWidth(), previewSize.getHeight());
+        } else {
+            cameraTextureView.setAspectRatio(
+                    previewSize.getHeight(), previewSize.getWidth());
+        }
 
     }
 
@@ -487,7 +518,7 @@ public class Camera2Instant {
         this.cameraActivity = cameraActivity;
     }
 
-    public void setCameraTextureView(TextureView textureView ) {
+    public void setCameraTextureView(CameraTextureView textureView ) {
         this.cameraTextureView = textureView;
         Log.i(TAG, "cameraTextureView width: " + cameraTextureView.getWidth() + " height: " + cameraTextureView.getHeight());
     }
@@ -610,7 +641,7 @@ public class Camera2Instant {
                 imageAvailableListener, backgroundHandler);
         previewSize = new Size(cameraTextureView.getWidth(), cameraTextureView.getHeight());
         if (cameraTextureView.isAvailable()) {
-            Log.i(TAG, "camera texture view was not available ");
+            Log.i(TAG, "camera texture view was available ");
             openCamera(cameraTextureView.getWidth(), cameraTextureView.getHeight());
         } else {
             Log.i(TAG, "camera texture view was not available ");
@@ -623,6 +654,22 @@ public class Camera2Instant {
         stopBackgroundThread();
     }
 
+
+    /**
+     * Retrieves the JPEG orientation from the specified screen rotation.
+     *
+     * @param rotation The screen rotation.
+     * @return The JPEG orientation (one of 0, 90, 270, and 360)
+     */
+    private int getOrientation(int rotation) {
+        // Sensor orientation is 90 for most devices, or 270 for some devices (eg. Nexus 5X)
+        // We have to take that into account and rotate JPEG properly.
+        // For devices with orientation of 90, we simply return our mapping from ORIENTATIONS.
+        // For devices with orientation of 270, we need to rotate the JPEG 180 degrees.
+        // For Nexus 7 the orientation of front camera (Nexus 7) was 270
+        // For Nexus & the orientation of back camera (Nexus 7) was 90
+        return (ORIENTATIONS.get(rotation) + sensorOrientation + 270) % 360;
+    }
     /**
      * Given {@code choices} of {@code Size}s supported by a camera, choose the smallest one that
      * is at least as large as the respective texture view size, and that is at most as large as the
@@ -789,6 +836,10 @@ public class Camera2Instant {
         lockFocus();
     }
 
+    public void setPictureOrientation(int orientation){
+        this.deviceOrientation = orientation;
+    }
+
     public void setAutoFlash(CaptureRequest.Builder requestBuilder) {
         if (cameraFeature.isFlashSupport()) {
             requestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
@@ -912,12 +963,12 @@ public class Camera2Instant {
             }
 
             // This is the CaptureRequest.Builder that we use to take a picture.
-            stillCaptureRequstBuilder =
+            stillCaptureRequestBuilder =
                     currentCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
-            stillCaptureRequstBuilder.addTarget(imageReader.getSurface());
+            stillCaptureRequestBuilder.addTarget(imageReader.getSurface());
 
             // Use the same AE and AF modes as the preview.
-            stillCaptureRequstBuilder.set(CaptureRequest.CONTROL_AF_MODE,
+            stillCaptureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
                     CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
             /*
             CameraCaptureSession.CaptureCallback stillCaptureCallback
@@ -933,8 +984,12 @@ public class Camera2Instant {
                 }
             };
             */
+            // Orientation
+            //int rotation = activity.getWindowManager().getDefaultDisplay().getRotation();
+            stillCaptureRequestBuilder.set(CaptureRequest.JPEG_ORIENTATION, getOrientation(deviceOrientation));
+
             captureSession.stopRepeating();
-            captureSession.capture(stillCaptureRequstBuilder.build(), captureStillCallback, null);
+            captureSession.capture(stillCaptureRequestBuilder.build(), captureStillCallback, null);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -1002,7 +1057,9 @@ public class Camera2Instant {
             try {
                 output = new FileOutputStream(file);
                 output.write(bytes);
-                imageListener.onImageByte(bytes);
+                if(imageListener != null) {
+                    imageListener.onImageByte(bytes);
+                }
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {

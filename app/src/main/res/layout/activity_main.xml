@@ -7,11 +7,11 @@
     android:background="#000"
     tools:context="tw.com.hgdata.www.camerasample.MainActivity">
 
-    <TextureView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+    <com.lackary.camera2tool.utility.CameraTextureView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:id="@+id/camera_preview"
-        android:layout_gravity="center"
+        android:layout_centerInParent="true"
         android:layout_above="@+id/frame_control" />
 
     <FrameLayout
@@ -48,26 +48,4 @@
             android:src="@drawable/ic_action_info" />
         -->
     </FrameLayout>
-
-    <TextView
-        android:text="TextView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentStart="true"
-        android:layout_marginStart="30dp"
-        android:layout_marginTop="30dp"
-        android:id="@+id/txt_pitch"
-        android:textColor="@android:color/holo_red_dark" />
-
-    <TextView
-        android:text="TextView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentEnd="true"
-        android:layout_marginEnd="30dp"
-        android:layout_marginTop="30dp"
-        android:id="@+id/txt_roll"
-        android:textColor="@android:color/holo_red_dark" />
 </RelativeLayout>
