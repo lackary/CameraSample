@@ -43,13 +43,13 @@ public abstract class DeviceOrientationListener extends OrientationEventListener
     public void onOrientationChanged(final int orientation) {
         int currentOrientation = OrientationEventListener.ORIENTATION_UNKNOWN;
         if (orientation >= 330 || orientation < 30) {
-            currentOrientation = ORIENTATION_0;
+            currentOrientation = Surface.ROTATION_0;
         } else if (orientation >= 60 && orientation < 120) {
-            currentOrientation = ORIENTATION_90;
+            currentOrientation = Surface.ROTATION_90;
         } else if (orientation >= 150 && orientation < 210) {
-            currentOrientation = ORIENTATION_180;
+            currentOrientation = Surface.ROTATION_180;
         } else if (orientation >= 240 && orientation < 300) {
-            currentOrientation = ORIENTATION_270;
+            currentOrientation = Surface.ROTATION_270;
         } else {
             currentOrientation = oldOrientation;
         }

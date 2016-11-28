@@ -25,8 +25,6 @@ import com.lackary.camera2tool.utility.DeviceOrientationListener;
 public class MainActivity extends Activity implements View.OnClickListener, View.OnLongClickListener{
     private final String TAG = this.getClass().getSimpleName();
 
-    private static final int SENSOR_DELAY = 500 * 1000; // 500ms
-    private static final int FROM_RADS_TO_DEGS = -57;
     private Camera2Instant cameraInstant;
 
     private CameraTextureView cameraTextureView;

@@ -83,10 +83,10 @@ public class Camera2Instant {
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
 
     static {
-        ORIENTATIONS.append(Surface.ROTATION_0, 90);
-        ORIENTATIONS.append(Surface.ROTATION_90, 0);
-        ORIENTATIONS.append(Surface.ROTATION_180, 270);
-        ORIENTATIONS.append(Surface.ROTATION_270, 180);
+        ORIENTATIONS.append(Surface.ROTATION_0, 0);
+        ORIENTATIONS.append(Surface.ROTATION_90, 90);
+        ORIENTATIONS.append(Surface.ROTATION_180, 180);
+        ORIENTATIONS.append(Surface.ROTATION_270, 270);
     }
 
     /**
@@ -666,9 +666,25 @@ public class Camera2Instant {
         // We have to take that into account and rotate JPEG properly.
         // For devices with orientation of 90, we simply return our mapping from ORIENTATIONS.
         // For devices with orientation of 270, we need to rotate the JPEG 180 degrees.
-        // For Nexus 7 the orientation of front camera (Nexus 7) was 270
-        // For Nexus & the orientation of back camera (Nexus 7) was 90
-        return (ORIENTATIONS.get(rotation) + sensorOrientation + 270) % 360;
+        // For Nexus 7 the orientation of front camera was 270
+        // For Nexus 7 the orientation of back camera was 90
+        Log.i(TAG, "ORIENTATIONS: " + ORIENTATIONS.get(rotation));
+        int fixOrientation = -1;
+        if (sensorOrientation == 270) {
+            switch (rotation) {
+                case Surface.ROTATION_90:
+                    fixOrientation = 3;
+                    break;
+                case Surface.ROTATION_270:
+                    fixOrientation = 1;
+                    break;
+                default:
+                    fixOrientation = rotation;
+            }
+        } else {
+            fixOrientation = rotation;
+        }
+        return (ORIENTATIONS.get(fixOrientation) + sensorOrientation) % 360;
     }
     /**
      * Given {@code choices} of {@code Size}s supported by a camera, choose the smallest one that
