@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
@@ -31,6 +32,12 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
     private Button captureBtn;
 
+    private ImageButton switchImgBtn;
+
+    private void initView() {
+        
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -39,6 +46,8 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         cameraTextureView = (CameraTextureView) findViewById(R.id.camera_preview);
         captureBtn = (Button) findViewById(R.id.btn_capture);
         captureBtn.setOnClickListener(this);
+
+
 
         cameraInstant = Camera2Instant.getInstance();
         cameraInstant.setCameraActivity(this);
@@ -82,6 +91,11 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         switch (v.getId()) {
             case R.id.btn_capture:
                 cameraInstant.capture();
+                break;
+            case R.id.img_btn_switch_camera:
+                cameraInstant.closeCamera();
+                cameraInstant.initCamera(CameraCharacteristics.LENS_FACING_FRONT);
+
                 break;
         }
     }
