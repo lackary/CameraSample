@@ -22,12 +22,20 @@ public abstract class DeviceOrientationListener extends OrientationEventListener
     private ReentrantLock lock = new ReentrantLock(true);
     private volatile int defaultScreenOrientation = CONFIGURATION_ORIENTATION_UNDEFINED;
 
+    private int formOrientation = OrientationEventListener.ORIENTATION_UNKNOWN;
+    private int relayOrientation = OrientationEventListener.ORIENTATION_UNKNOWN;
+    private int toOrientation = OrientationEventListener.ORIENTATION_UNKNOWN;
+
     private final int ORIENTATION_0 = 0;
     private final int ORIENTATION_90 = 90;
     private final int ORIENTATION_180 = 180;
     private final int ORIENTATION_270 = 270;
 
-    private int oldOrientation = -1;
+    public final int CLOCKWISE = 1;
+    public final int ANTI_CLOCKWISE = 0;
+    public final int UNKNOWN_CLOCKWISE = -1;
+
+    private int clockwise = -1;
 
     public DeviceOrientationListener(Context context) {
         super(context);
@@ -42,6 +50,8 @@ public abstract class DeviceOrientationListener extends OrientationEventListener
     @Override
     public void onOrientationChanged(final int orientation) {
         int currentOrientation = OrientationEventListener.ORIENTATION_UNKNOWN;
+
+        toOrientation = orientation;
         if (orientation >= 330 || orientation < 30) {
             currentOrientation = Surface.ROTATION_0;
         } else if (orientation >= 60 && orientation < 120) {
@@ -51,17 +61,27 @@ public abstract class DeviceOrientationListener extends OrientationEventListener
         } else if (orientation >= 240 && orientation < 300) {
             currentOrientation = Surface.ROTATION_270;
         } else {
-            currentOrientation = oldOrientation;
+            currentOrientation = prevOrientation;
         }
-
         if (prevOrientation != currentOrientation && orientation != OrientationEventListener.ORIENTATION_UNKNOWN) {
             prevOrientation = currentOrientation;
+
+            Log.i(TAG, "clockwise: " + formOrientation + " " + relayOrientation + " " + toOrientation);
             if (currentOrientation != OrientationEventListener.ORIENTATION_UNKNOWN)
                 //reportOrientationChanged(currentOrientation);
                 //Log.i(TAG, "defaultOrientation:" + getDeviceDefaultOrientation());
-                onDeviceOrientationChanged(currentOrientation);
-                oldOrientation = currentOrientation;
+                if(toOrientation > formOrientation) {
+                    clockwise = CLOCKWISE;
+                } else if(toOrientation < formOrientation) {
+                    clockwise = ANTI_CLOCKWISE;
+                } else {
+                    clockwise = UNKNOWN_CLOCKWISE;
+                }
+                onDeviceOrientationChanged(currentOrientation, clockwise);
+                //oldOrientation = currentOrientation;
         }
+        formOrientation  = orientation;
+
 
     }
 
@@ -80,7 +100,7 @@ public abstract class DeviceOrientationListener extends OrientationEventListener
         else
             toReportOrientation = orthogonalOrientation;
 
-        onDeviceOrientationChanged(toReportOrientation);
+       onDeviceOrientationChanged(toReportOrientation, clockwise);
     }
 
     /**
@@ -125,6 +145,6 @@ public abstract class DeviceOrientationListener extends OrientationEventListener
      *
      * @param orientation value of {@link Configuration#ORIENTATION_LANDSCAPE} or {@link Configuration#ORIENTATION_PORTRAIT}
      */
-    public abstract void onDeviceOrientationChanged(int orientation);
+    public abstract void onDeviceOrientationChanged(int orientation, int clockwise);
 
 }

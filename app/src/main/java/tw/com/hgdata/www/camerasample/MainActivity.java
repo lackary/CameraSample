@@ -1,17 +1,14 @@
 package tw.com.hgdata.www.camerasample;
 
 import android.app.Activity;
-import android.content.Context;
-import android.content.res.Configuration;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorManager;
 import android.hardware.camera2.CameraCharacteristics;
 import android.os.Environment;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
+import android.view.animation.RotateAnimation;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
@@ -34,8 +31,19 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
     private ImageButton switchImgBtn;
 
+    private int fromRotation = 0;
+
+    boolean currentFacing = true;
+
     private void initView() {
-        
+        cameraTextureView = (CameraTextureView) findViewById(R.id.camera_preview);
+        captureBtn = (Button) findViewById(R.id.btn_capture);
+        switchImgBtn = (ImageButton) findViewById(R.id.img_btn_switch_camera);
+    }
+
+    private void setView () {
+        captureBtn.setOnClickListener(this);
+        switchImgBtn.setOnClickListener(this);
     }
 
     @Override
@@ -43,12 +51,9 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        cameraTextureView = (CameraTextureView) findViewById(R.id.camera_preview);
-        captureBtn = (Button) findViewById(R.id.btn_capture);
-        captureBtn.setOnClickListener(this);
+        initView();
 
-
-
+        //camera setting
         cameraInstant = Camera2Instant.getInstance();
         cameraInstant.setCameraActivity(this);
         cameraInstant.setCameraTextureView(cameraTextureView);
@@ -56,14 +61,56 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         //cameraInstant.setPicturePath(getExternalFilesDir(Environment.DIRECTORY_PICTURES));
         cameraInstant.setPicturePath("FullCamera");
         cameraInstant.initCamera(CameraCharacteristics.LENS_FACING_BACK);
+        //Log.i(TAG, "not currentFacing:" + ~currentFacing);
 
 
         DeviceOrientationListener deviceOrientationListener = new DeviceOrientationListener(this) {
 
             @Override
-            public void onDeviceOrientationChanged(int orientation) {
+            public void onDeviceOrientationChanged(int orientation, int clockwise) {
                 Log.i(TAG, "orientation: " + orientation);
                 MainActivity.this.cameraInstant.setPictureOrientation(orientation);
+                int toRotation;
+                switch(orientation) {
+                    case Surface.ROTATION_0:
+                        toRotation = 0;
+                        break;
+                    case Surface.ROTATION_90:
+                        toRotation = 270;
+                        break;
+                    case Surface.ROTATION_180:
+                        toRotation = 180;
+                        break;
+                    case Surface.ROTATION_270:
+                        toRotation = 90;
+                        break;
+                    default:
+                        toRotation = 0;
+                }
+                Log.i(TAG, "form:" + fromRotation + "to:" + toRotation);
+                Log.i(TAG, "clockwise:" + clockwise);
+                switch (clockwise) {
+                    case ANTI_CLOCKWISE:
+                        if(toRotation == Surface.ROTATION_0) {
+                            toRotation += 360;
+                        }
+                        break;
+                    case CLOCKWISE:
+                        if(fromRotation == Surface.ROTATION_0) {
+                            fromRotation += 360;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+
+                final RotateAnimation rotateAnim = new RotateAnimation(
+                        fromRotation, toRotation, switchImgBtn.getWidth()/2, switchImgBtn.getHeight()/2);
+                rotateAnim.setDuration(500); // Use 0 ms to rotate instantly
+                rotateAnim.setFillAfter(true); // Must be true or the animation will reset
+                switchImgBtn.startAnimation(rotateAnim);
+                fromRotation = toRotation;
+
             }
         };
 
@@ -76,6 +123,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     protected void onResume() {
         Log.i(TAG, "onResume");
         super.onResume();
+        setView();
         cameraInstant.resumeCamera();
     }
 
@@ -94,8 +142,9 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                 break;
             case R.id.img_btn_switch_camera:
                 cameraInstant.closeCamera();
-                cameraInstant.initCamera(CameraCharacteristics.LENS_FACING_FRONT);
-
+                cameraInstant.initCamera(currentFacing?CameraCharacteristics.LENS_FACING_FRONT:CameraCharacteristics.LENS_FACING_BACK);
+                cameraInstant.resumeCamera();
+                currentFacing = !currentFacing;
                 break;
         }
     }

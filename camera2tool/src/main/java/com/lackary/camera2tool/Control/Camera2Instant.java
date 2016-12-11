@@ -654,7 +654,6 @@ public class Camera2Instant {
         stopBackgroundThread();
     }
 
-
     /**
      * Retrieves the JPEG orientation from the specified screen rotation.
      *
