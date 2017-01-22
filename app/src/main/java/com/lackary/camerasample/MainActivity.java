@@ -1,4 +1,4 @@
-package tw.com.hgdata.www.camerasample;
+package com.lackary.camerasample;
 
 import android.app.Activity;
 import android.hardware.camera2.CameraCharacteristics;
