@@ -374,8 +374,8 @@ public class Camera2Instant {
                             currentState = STATE_PICTURE_TAKEN;
                             captureStillPicture();
                         } else {
-                            Log.i(TAG, "runPrecaptureSequence");
-                            //runPrecaptureSequence();
+                            Log.i(TAG, "runPreCaptureSequence");
+                            //runPreCaptureSequence();
                         }
                     } else if (CaptureResult.CONTROL_AF_MODE_OFF == afState){
                         Log.i(TAG, "afState was off: " + afState);
@@ -760,25 +760,24 @@ public class Camera2Instant {
             //get AE compensation step
             Rational aeStep = cameraCharacteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP);
             Log.i(TAG, "AE compensation step: " + aeStep);
-            //cameraFeature.setAeCompensationStep(cameraCharacteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP));
 
             //get Apertures lens
             float[] lensApertures = cameraCharacteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_APERTURES);
             Log.i(TAG, "Apertures of lens: " + lensApertures);
-            //cameraFeature.setLensApertures(cameraCharacteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_APERTURES));
 
             //get auto exposure modes
             int[] AEModes = cameraCharacteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES);
             Log.i(TAG, "AEModes: " + AEModes.length);
-            //cameraFeature.setAeModes(cameraCharacteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES));
             //get auto focus modes
             int[] AFModes = cameraCharacteristics.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES);
             Log.i(TAG, "AFModes: " + AFModes.length);
-            //cameraFeature.setAfModes(cameraCharacteristics.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES));
+            //get the maximum number of metering region
+            int MXRAF = cameraCharacteristics.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF);
+            Log.i(TAG, "Max region of AF: " +  MXRAF);
             //get auto white balance modes
+
             int[] AWBModes = cameraCharacteristics.get(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES);
             Log.i(TAG, "AWBModes: " + AWBModes.length);
-            //cameraFeature.setAwbModes(cameraCharacteristics.get(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES));
 
             //
             //get auto white balance range

@@ -43,6 +43,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
     private void setView () {
         captureBtn.setOnClickListener(this);
+        captureBtn.setOnLongClickListener(this);
         switchImgBtn.setOnClickListener(this);
     }
 
@@ -136,6 +137,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
     @Override
     public void onClick(View v) {
+        Log.i(TAG, "capture button click");
         switch (v.getId()) {
             case R.id.btn_capture:
                 cameraInstant.capture();
@@ -151,6 +153,12 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
     @Override
     public boolean onLongClick(View v) {
+        Log.i(TAG, "capture button long click");
+        switch (v.getId()) {
+            case R.id.btn_capture:
+                break;
+
+        }
         return false;
     }
 

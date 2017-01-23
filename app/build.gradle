@@ -5,7 +5,7 @@ android {
     buildToolsVersion "25.0.0"
 
     defaultConfig {
-        applicationId "tw.com.hgdata.www.camerasample"
+        applicationId "com.lackary.camerasample"
         minSdkVersion 21
         targetSdkVersion 25
         versionCode 1
