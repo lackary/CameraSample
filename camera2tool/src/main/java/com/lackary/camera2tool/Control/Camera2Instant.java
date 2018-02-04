@@ -790,7 +790,7 @@ public class Camera2Instant {
     }
 
 
-    public void setPicturePath(String foldar) {
+    public void setPicturePath(String folder) {
         if(!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
             Log.i(TAG, "This Phone did not have mount");
             return;
@@ -803,7 +803,7 @@ public class Camera2Instant {
         Log.i(TAG, "Environment dir: " + dir.getPath());
         Log.i(TAG, "Environment dir: " + dir.getAbsolutePath());
         Log.i(TAG, "Environment dir: " + dir.getName());
-        File pictureDir = new File(dir.getPath() + "/"+ foldar);
+        File pictureDir = new File(dir.getPath() + "/"+ folder);
         //this.pictureDir = dir;
         if(!pictureDir.exists()) {
             Log.i(TAG, "This dir is not exist");
