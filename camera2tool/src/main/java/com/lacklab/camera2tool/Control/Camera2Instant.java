@@ -1,4 +1,4 @@
-package com.lackary.camera2tool.Control;
+package com.lacklab.camera2tool.Control;
 
 import android.Manifest;
 import android.app.Activity;
@@ -24,30 +24,26 @@ import android.media.ImageReader;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
-import android.util.Range;
 import android.util.Rational;
 import android.util.Size;
 import android.util.SparseIntArray;
 import android.view.Surface;
 import android.view.TextureView;
 
-import com.lackary.camera2tool.utility.CameraTextureView;
+import com.lacklab.camera2tool.utility.CameraTextureView;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -63,6 +59,10 @@ public class Camera2Instant {
     private static final int REQUEST_CAMERA = 1;
 
     private static final int  REQUEST_WRITE_EXTERNAL_STORAGE = 1;
+
+    private static final String pictureDirName = "picture";
+
+    private static final String videoDirName = "video";
 
     private Activity cameraActivity;
 
@@ -191,6 +191,7 @@ public class Camera2Instant {
     private CaptureRequest previewRequest;
 
     private File pictureDir;
+    private File videoDir;
 
     /**
      * the streamConfiguration of Camera Device
@@ -803,7 +804,8 @@ public class Camera2Instant {
         Log.i(TAG, "Environment dir: " + dir.getPath());
         Log.i(TAG, "Environment dir: " + dir.getAbsolutePath());
         Log.i(TAG, "Environment dir: " + dir.getName());
-        File pictureDir = new File(dir.getPath() + "/"+ folder);
+        File pictureDir = new File(dir.getPath() + "/"+ folder + "/" + pictureDirName);
+        File videoDir = new File(dir.getPath() + "/" + folder + "/" + videoDirName);
         //this.pictureDir = dir;
         if(!pictureDir.exists()) {
             Log.i(TAG, "This dir is not exist");
@@ -815,6 +817,7 @@ public class Camera2Instant {
             Log.i(TAG, "picture dir: " + pictureDir.getName());
         }
         this.pictureDir = pictureDir;
+
 
     }
 

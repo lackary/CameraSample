@@ -1,24 +1,19 @@
-package com.lackary.camerasample;
+package com.lacklab.camerasample;
 
 import android.app.Activity;
 import android.hardware.camera2.CameraCharacteristics;
-import android.os.Environment;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Surface;
-import android.view.TextureView;
 import android.view.View;
 import android.view.animation.RotateAnimation;
 import android.widget.Button;
 import android.widget.ImageButton;
-import android.widget.TextView;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-
-import com.lackary.camera2tool.Control.Camera2Instant;
-import com.lackary.camera2tool.utility.CameraTextureView;
-import com.lackary.camera2tool.utility.DeviceOrientationListener;
+import com.lacklab.camera2tool.Control.Camera2Instant;
+import com.lacklab.camera2tool.utility.CameraTextureView;
+import com.lacklab.camera2tool.utility.DeviceOrientationListener;
+import com.lackary.camerasample.R;
 
 public class MainActivity extends Activity implements View.OnClickListener, View.OnLongClickListener{
     private final String TAG = this.getClass().getSimpleName();
@@ -62,6 +57,10 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         //cameraInstant.setPicturePath(getExternalFilesDir(Environment.DIRECTORY_PICTURES));
         cameraInstant.setPicturePath("FullCamera");
         cameraInstant.initCamera(CameraCharacteristics.LENS_FACING_BACK);
+        Log.i(TAG, "application file dir: " + this.getApplicationContext().getFilesDir());
+        //Log.i(TAG, "application data dir: " + this.getApplicationContext().getDataDir());
+        Log.i(TAG, "application cache dir: " + this.getApplicationContext().getCacheDir());
+        getApplicationContext().getObbDir();
         //Log.i(TAG, "not currentFacing:" + ~currentFacing);
 
 

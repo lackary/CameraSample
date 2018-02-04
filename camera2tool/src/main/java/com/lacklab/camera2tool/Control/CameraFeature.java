@@ -1,4 +1,4 @@
-package com.lackary.camera2tool.Control;
+package com.lacklab.camera2tool.Control;
 
 import android.util.Range;
 import android.util.Rational;

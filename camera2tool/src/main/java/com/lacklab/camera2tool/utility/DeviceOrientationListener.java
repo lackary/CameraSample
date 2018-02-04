@@ -1,4 +1,4 @@
-package com.lackary.camera2tool.utility;
+package com.lacklab.camera2tool.utility;
 
 import android.content.Context;
 import android.content.res.Configuration;

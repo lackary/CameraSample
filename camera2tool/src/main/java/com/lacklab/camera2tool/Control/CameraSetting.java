@@ -1,4 +1,4 @@
-package com.lackary.camera2tool.Control;
+package com.lacklab.camera2tool.Control;
 
 /**
  * Created by lackary on 2016/7/29.

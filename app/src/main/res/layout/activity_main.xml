@@ -6,9 +6,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000"
-    tools:context="com.lackary.camerasample.MainActivity">
+    tools:context="com.lackary.camerasample.com.lacklab.camerasample.MainActivity">
 
-    <com.lackary.camera2tool.utility.CameraTextureView
+    <com.lacklab.camera2tool.utility.CameraTextureView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:id="@+id/camera_preview"
