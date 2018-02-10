@@ -7,6 +7,6 @@
 
 - [x] Android min API 23
 - [x] take picture
-- [] record video
+- [ ] record video
 - [x] switch camera
-- [] white balance
+- [ ] white balance
