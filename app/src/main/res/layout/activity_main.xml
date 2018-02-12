@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000"
-    tools:context="com.lackary.camerasample.com.lacklab.camerasample.MainActivity">
+    tools:context="com.lacklab.camerasample.MainActivity">
 
     <com.lacklab.camera2tool.utility.CameraTextureView
         android:layout_width="match_parent"
@@ -23,7 +23,7 @@
         android:layout_alignParentStart="true"
         android:background="@color/control_background">
 
-        <Button
+        <ImageButton
             android:id="@+id/btn_capture"
             android:layout_width="72dp"
             android:layout_height="72dp"
@@ -31,7 +31,8 @@
             android:background="@drawable/still_btn"
             android:layout_centerVertical="true"
             android:layout_centerHorizontal="true"
-            android:elevation="6dp"/>
+            android:elevation="6dp"
+            android:src="@mipmap/ic_camera_black_48dp"/>
 
         <ImageButton
             android:id="@+id/img_btn_switch_camera"
@@ -44,14 +45,15 @@
             android:elevation="6dp"
             android:src="@drawable/switch_btn" />
 
-        <ImageView
-            android:id="@+id/imageView2"
+        <ImageButton
+            android:id="@+id/img_view_thumbnail"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentStart="true"
-            android:layout_alignTop="@+id/img_btn_switch_camera"
+            android:layout_centerVertical="true"
             android:layout_marginStart="24dp"
-            app:srcCompat="@mipmap/ic_launcher" />
+            android:elevation="6dp"
+            android:src="@mipmap/ic_launcher" />
 
         <!--
         <Button

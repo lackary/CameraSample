@@ -1,19 +1,22 @@
 package com.lacklab.camerasample;
 
 import android.app.Activity;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.hardware.camera2.CameraCharacteristics;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Surface;
 import android.view.View;
 import android.view.animation.RotateAnimation;
-import android.widget.Button;
 import android.widget.ImageButton;
 
-import com.lacklab.camera2tool.Control.Camera2Instant;
+import com.lacklab.camera2tool.control.Camera2Instant;
+import com.lacklab.camera2tool.module.ThumbnailInfo;
 import com.lacklab.camera2tool.utility.CameraTextureView;
 import com.lacklab.camera2tool.utility.DeviceOrientationListener;
 import com.lackary.camerasample.R;
+import com.lacklab.camera2tool.utility.MediaManager;
 
 public class MainActivity extends Activity implements View.OnClickListener, View.OnLongClickListener{
     private final String TAG = this.getClass().getSimpleName();
@@ -22,9 +25,11 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
     private CameraTextureView cameraTextureView;
 
-    private Button captureBtn;
+    private ImageButton captureImgBtn;
 
     private ImageButton switchImgBtn;
+
+    private ImageButton thumbnailImgBtn;
 
     private int fromRotation = 0;
 
@@ -32,14 +37,16 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
     private void initView() {
         cameraTextureView = (CameraTextureView) findViewById(R.id.camera_preview);
-        captureBtn = (Button) findViewById(R.id.btn_capture);
+        captureImgBtn = (ImageButton) findViewById(R.id.btn_capture);
         switchImgBtn = (ImageButton) findViewById(R.id.img_btn_switch_camera);
+        thumbnailImgBtn = (ImageButton) findViewById(R.id.img_view_thumbnail);
     }
 
     private void setView () {
-        captureBtn.setOnClickListener(this);
-        captureBtn.setOnLongClickListener(this);
+        captureImgBtn.setOnClickListener(this);
+        captureImgBtn.setOnLongClickListener(this);
         switchImgBtn.setOnClickListener(this);
+        thumbnailImgBtn.setOnClickListener(this);
     }
 
     @Override
@@ -53,9 +60,10 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         cameraInstant = Camera2Instant.getInstance();
         cameraInstant.setCameraActivity(this);
         cameraInstant.setCameraTextureView(cameraTextureView);
+        cameraInstant.setThumbnailImgBtn(thumbnailImgBtn);
         //private path /storage/...
         //cameraInstant.setPicturePath(getExternalFilesDir(Environment.DIRECTORY_PICTURES));
-        cameraInstant.setPicturePath("FullCamera");
+        cameraInstant.setCameraPath("FullCamera");
         cameraInstant.initCamera(CameraCharacteristics.LENS_FACING_BACK);
         Log.i(TAG, "application file dir: " + this.getApplicationContext().getFilesDir());
         //Log.i(TAG, "application data dir: " + this.getApplicationContext().getDataDir());
@@ -114,8 +122,13 @@ public class MainActivity extends Activity implements View.OnClickListener, View
             }
         };
 
+        //cameraInstant.getFiles();
+        //cameraInstant.setThumbnail();
+        //MediaManager fileManager = new MediaManager(this.getApplicationContext());
+        //ThumbnailInfo thumbnailInfo = fileManager.getLastThumbnailInfo(cameraInstant.getCameraDir());
+        //Bitmap bitmap = BitmapFactory.decodeFile(thumbnailInfo.getPath());
+        //thumbnailImgBtn.setImageBitmap(bitmap);
         deviceOrientationListener.enable();
-
 
     }
 

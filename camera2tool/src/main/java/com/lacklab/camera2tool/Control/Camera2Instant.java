@@ -1,4 +1,4 @@
-package com.lacklab.camera2tool.Control;
+package com.lacklab.camera2tool.control;
 
 import android.Manifest;
 import android.app.Activity;
@@ -21,6 +21,7 @@ import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
+import android.media.MediaRecorder;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -32,6 +33,10 @@ import android.util.Size;
 import android.util.SparseIntArray;
 import android.view.Surface;
 import android.view.TextureView;
+import android.widget.ImageButton;
+
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 
 import com.lacklab.camera2tool.utility.CameraTextureView;
 
@@ -60,9 +65,10 @@ public class Camera2Instant {
 
     private static final int  REQUEST_WRITE_EXTERNAL_STORAGE = 1;
 
-    private static final String pictureDirName = "picture";
-
-    private static final String videoDirName = "video";
+    private static final String[] CAMERA_PERMISSIONS = {
+            Manifest.permission.CAMERA,
+            Manifest.permission.RECORD_AUDIO,
+    };
 
     private Activity cameraActivity;
 
@@ -76,6 +82,7 @@ public class Camera2Instant {
 
     private String currentCameraId;
 
+    private List<String> filePathList = new ArrayList<String>();
 
     /**
      * Conversion from screen rotation to JPEG orientation.
@@ -90,16 +97,26 @@ public class Camera2Instant {
     }
 
     /**
-     * A Textureview that handles preview
+     * A Texture view that handles preview
      */
     //private TextureView cameraTextureView;
 
     private CameraTextureView cameraTextureView;
 
     /**
-     * An ImageReader that handles still image capture.
+     * A thumbnail
+     */
+    private ImageButton thumbnailImgBtn;
+
+    /**
+     *  An ImageReader that handles still image.
      */
     private ImageReader imageReader;
+
+    /**
+     *  An MediaRecorder that handler record video.
+     */
+    private MediaRecorder mediaRecorder;
 
     /**
      * The android.util.Size of camera preview.
@@ -190,8 +207,7 @@ public class Camera2Instant {
      */
     private CaptureRequest previewRequest;
 
-    private File pictureDir;
-    private File videoDir;
+    private File cameraDir;
 
     /**
      * the streamConfiguration of Camera Device
@@ -216,6 +232,10 @@ public class Camera2Instant {
 
     public interface ImageListener {
         void onImageByte(byte[] bytes);
+    }
+
+    public File getCameraDir() {
+        return cameraDir;
     }
 
     private void setUpCameraPreview(int width, int height) {
@@ -509,7 +529,7 @@ public class Camera2Instant {
             Calendar calendar = Calendar.getInstance();
             long timeInMillis  = calendar.getTimeInMillis();
             Log.i(TAG, "millisecond: " + timeInMillis);
-            File file = new File(pictureDir, "FC_"+ timeInMillis +".jpg");
+            File file = new File(cameraDir, "FC_"+ timeInMillis +".jpg");
             backgroundHandler.post(new ImageSaver(reader.acquireNextImage(), file));
         }
 
@@ -586,6 +606,16 @@ public class Camera2Instant {
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
+    }
+
+    private boolean isPermissionGranted(String[] permissions) {
+        for (String permission : permissions) {
+            if (ContextCompat.checkSelfPermission(cameraActivity, permission) !=
+                    PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public void openCamera(int width, int height) {
@@ -791,34 +821,32 @@ public class Camera2Instant {
     }
 
 
-    public void setPicturePath(String folder) {
+    public void setCameraPath(String folder) {
         if(!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
             Log.i(TAG, "This Phone did not have mount");
             return;
         }
         if (ContextCompat.checkSelfPermission(cameraActivity, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            requestWriteExternalStoragePremission();
+            requestWriteExternalStoragePermission();
         }
         File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
         //File dir = this.cameraActivity.getExternalFilesDir(Environment.DIRECTORY_DCIM);
         Log.i(TAG, "Environment dir: " + dir.getPath());
         Log.i(TAG, "Environment dir: " + dir.getAbsolutePath());
         Log.i(TAG, "Environment dir: " + dir.getName());
-        File pictureDir = new File(dir.getPath() + "/"+ folder + "/" + pictureDirName);
-        File videoDir = new File(dir.getPath() + "/" + folder + "/" + videoDirName);
+        cameraDir = new File(dir.getPath() + "/"+ folder);
+        //File pictureDir = new File(dir.getPath() + "/"+ folder + "/" + pictureDirName);
+        //File videoDir = new File(dir.getPath() + "/" + folder + "/" + videoDirName);
         //this.pictureDir = dir;
-        if(!pictureDir.exists()) {
+        if(!cameraDir.exists()) {
             Log.i(TAG, "This dir is not exist");
-            if(!pictureDir.mkdir()) {
+            if(!cameraDir.mkdir()) {
                 Log.i(TAG, "this dir did not mkdir ");
             }
-            Log.i(TAG, "picture dir: " + pictureDir.getPath());
-            Log.i(TAG, "picture dir: " + pictureDir.getAbsolutePath());
-            Log.i(TAG, "picture dir: " + pictureDir.getName());
+            Log.i(TAG, "picture dir: " + cameraDir.getPath());
+            Log.i(TAG, "picture dir: " + cameraDir.getAbsolutePath());
+            Log.i(TAG, "picture dir: " + cameraDir.getName());
         }
-        this.pictureDir = pictureDir;
-
-
     }
 
     public void capture() {
@@ -898,7 +926,7 @@ public class Camera2Instant {
     }
 
     /**
-     * Stops the background thread and its  Handler.
+     * Stops the background thread and its Handler.
      */
     private void stopBackgroundThread() {
         backgroundThread.quitSafely();
@@ -923,7 +951,8 @@ public class Camera2Instant {
         }
     }
 
-    private void requestWriteExternalStoragePremission() {
+
+    private void requestWriteExternalStoragePermission() {
         if(ActivityCompat.shouldShowRequestPermissionRationale(cameraActivity,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
             //new ConfirmationDialog().show(getChildFragmentManager(), FRAGMENT_DIALOG);
@@ -1012,6 +1041,22 @@ public class Camera2Instant {
         }
     }
 
+    public File[] getFiles() {
+        Log.i(TAG, "get files");
+        return this.cameraDir.listFiles();
+    }
+
+    public void setThumbnailImgBtn(ImageButton thumbnailImgBtn) {
+        this.thumbnailImgBtn = thumbnailImgBtn;
+    }
+
+    public void setThumbnail() {
+        Log.i(TAG, this.cameraDir.getPath());
+        String filePath = this.cameraDir.getPath() + "/" + this.cameraDir.list()[this.cameraDir.list().length - 1];
+        Bitmap bitmap = BitmapFactory.decodeFile(filePath);
+
+        this.thumbnailImgBtn.setImageBitmap(bitmap);
+    }
     /**
      * Run the precapture sequence for capturing a still image. This method should be called when
      * we get a response in {@link #captureCallback} from {@link #lockFocus()}.
