@@ -68,6 +68,7 @@ public class Camera2Instant {
     private static final String[] CAMERA_PERMISSIONS = {
             Manifest.permission.CAMERA,
             Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
     };
 
     private Activity cameraActivity;
@@ -545,6 +546,7 @@ public class Camera2Instant {
     }
 
     public void initCamera(int lens) {
+
         cameraManager = (CameraManager) cameraActivity.getSystemService(Context.CAMERA_SERVICE);
         try {
             for(String cameraId : cameraManager.getCameraIdList()) {
@@ -610,7 +612,7 @@ public class Camera2Instant {
 
     private boolean isPermissionGranted(String[] permissions) {
         for (String permission : permissions) {
-            if (ContextCompat.checkSelfPermission(cameraActivity, permission) !=
+            if (ActivityCompat.checkSelfPermission(cameraActivity, permission) !=
                     PackageManager.PERMISSION_GRANTED) {
                 return false;
             }
@@ -618,13 +620,13 @@ public class Camera2Instant {
         return true;
     }
 
+    @SuppressWarnings("MissingPermission")
     public void openCamera(int width, int height) {
         Log.i(TAG, "openCamera");
-        if (ContextCompat.checkSelfPermission(cameraActivity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+        if (!isPermissionGranted(CAMERA_PERMISSIONS)) {
             requestCameraPermission();
             return;
         }
-
         setUpCameraPreview(width, height);
 
         cameraManager = (CameraManager) cameraActivity.getSystemService(Context.CAMERA_SERVICE);
@@ -826,9 +828,11 @@ public class Camera2Instant {
             Log.i(TAG, "This Phone did not have mount");
             return;
         }
+        /*
         if (ContextCompat.checkSelfPermission(cameraActivity, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             requestWriteExternalStoragePermission();
         }
+        */
         File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
         //File dir = this.cameraActivity.getExternalFilesDir(Environment.DIRECTORY_DCIM);
         Log.i(TAG, "Environment dir: " + dir.getPath());
@@ -939,14 +943,20 @@ public class Camera2Instant {
         }
     }
 
+    private boolean shouldShowRequestPermissionsRationale(String[] permissions) {
+        for (String permission : permissions) {
+            if (ActivityCompat.shouldShowRequestPermissionRationale(cameraActivity, permission))
+                return true;
+        }
+        return false;
+    }
+
     private void requestCameraPermission() {
-        if(ActivityCompat.shouldShowRequestPermissionRationale(cameraActivity,
-                Manifest.permission.CAMERA)) {
+        if(shouldShowRequestPermissionsRationale(CAMERA_PERMISSIONS)) {
             //new ConfirmationDialog().show(getChildFragmentManager(), FRAGMENT_DIALOG);
         } else {
             //first time, AndroidManifest must set user-permission
-            ActivityCompat.requestPermissions(cameraActivity,
-                    new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA);
+            ActivityCompat.requestPermissions(cameraActivity, CAMERA_PERMISSIONS, REQUEST_CAMERA);
             Log.v(TAG, "requestPermissions");
         }
     }
