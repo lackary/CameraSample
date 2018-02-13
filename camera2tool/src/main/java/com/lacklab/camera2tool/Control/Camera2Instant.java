@@ -629,7 +629,7 @@ public class Camera2Instant {
         }
         setUpCameraPreview(width, height);
 
-        cameraManager = (CameraManager) cameraActivity.getSystemService(Context.CAMERA_SERVICE);
+        //cameraManager = (CameraManager) cameraActivity.getSystemService(Context.CAMERA_SERVICE);
 
         try {
             if (!cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
