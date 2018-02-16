@@ -27,6 +27,8 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
     private ImageButton captureImgBtn;
 
+    private ImageButton modeImage;
+
     private ImageButton switchImgBtn;
 
     private ImageButton thumbnailImgBtn;
@@ -37,7 +39,8 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
     private void initView() {
         cameraTextureView = (CameraTextureView) findViewById(R.id.camera_preview);
-        captureImgBtn = (ImageButton) findViewById(R.id.btn_capture);
+        captureImgBtn = (ImageButton) findViewById(R.id.img_btn_capture);
+        modeImage = (ImageButton) findViewById(R.id.img_btn_switch_capture);
         switchImgBtn = (ImageButton) findViewById(R.id.img_btn_switch_camera);
         thumbnailImgBtn = (ImageButton) findViewById(R.id.img_view_thumbnail);
     }
@@ -46,6 +49,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         captureImgBtn.setOnClickListener(this);
         captureImgBtn.setOnLongClickListener(this);
         switchImgBtn.setOnClickListener(this);
+        modeImage.setOnClickListener(this);
         thumbnailImgBtn.setOnClickListener(this);
     }
 
@@ -137,7 +141,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         Log.i(TAG, "onResume");
         super.onResume();
         setView();
-        cameraInstant.resumeCamera();
+        cameraInstant.resumeCamera(cameraInstant.getCurrentMode());
     }
 
     @Override
@@ -151,13 +155,24 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     public void onClick(View v) {
         Log.i(TAG, "capture button click");
         switch (v.getId()) {
-            case R.id.btn_capture:
+            case R.id.img_btn_capture:
                 cameraInstant.capture();
+                break;
+            case R.id.img_btn_switch_capture:
+                if (cameraInstant.getCurrentMode() == Camera2Instant.IMAGE_MODE) {
+                    modeImage.setImageResource(R.mipmap.ic_camera_alt_white_48dp);
+                    cameraInstant.closeCamera();
+                    cameraInstant.resumeCamera(Camera2Instant.VIDEO_MODE);
+                } else if (cameraInstant.getCurrentMode() == Camera2Instant.VIDEO_MODE) {
+                    modeImage.setImageResource(R.mipmap.ic_videocam_white_48dp);
+                    cameraInstant.closeCamera();
+                    cameraInstant.resumeCamera(Camera2Instant.IMAGE_MODE);
+                }
                 break;
             case R.id.img_btn_switch_camera:
                 cameraInstant.closeCamera();
                 cameraInstant.initCamera(currentFacing?CameraCharacteristics.LENS_FACING_FRONT:CameraCharacteristics.LENS_FACING_BACK);
-                cameraInstant.resumeCamera();
+                cameraInstant.resumeCamera(cameraInstant.getCurrentMode());
                 currentFacing = !currentFacing;
                 break;
         }
@@ -167,7 +182,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     public boolean onLongClick(View v) {
         Log.i(TAG, "capture button long click");
         switch (v.getId()) {
-            case R.id.btn_capture:
+            case R.id.img_btn_capture:
                 break;
 
         }

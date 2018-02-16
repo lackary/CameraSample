@@ -4,7 +4,7 @@
     <color name="colorPrimaryDark">#303F9F</color>
     <color name="colorAccent">#ff4081</color>
     <color name="control_background">#FFFFFF</color>
-    <color name="color_still_btn">#81D4FA</color>
-    <color name="color_still_btn_pressed">#039BE5</color>
+    <color name="color_control_image_btn">#81D4FA</color>
+    <color name="color_control_image_btn_pressed">#039BE5</color>
     <color name="color_capture_bkg">#FAFAFA</color>
 </resources>

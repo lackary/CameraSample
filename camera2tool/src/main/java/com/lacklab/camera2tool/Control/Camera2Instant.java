@@ -25,6 +25,7 @@ import android.media.MediaRecorder;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
@@ -71,6 +72,10 @@ public class Camera2Instant {
             Manifest.permission.WRITE_EXTERNAL_STORAGE,
     };
 
+    public static final int IMAGE_MODE = 1;
+
+    public static final int VIDEO_MODE = 2;
+
     private Activity cameraActivity;
 
     private HandlerThread backgroundThread;
@@ -82,6 +87,8 @@ public class Camera2Instant {
     private String backCameraId;
 
     private String currentCameraId;
+
+    private int currentMode = 1;
 
     private List<String> filePathList = new ArrayList<String>();
 
@@ -161,6 +168,8 @@ public class Camera2Instant {
 
     private Size largestPic;
 
+    private Size largestVideo;
+
     /**
      * Orientation of the camera sensor
      */
@@ -237,6 +246,10 @@ public class Camera2Instant {
 
     public File getCameraDir() {
         return cameraDir;
+    }
+
+    public int getCurrentMode() {
+        return currentMode;
     }
 
     private void setUpCameraPreview(int width, int height) {
@@ -345,7 +358,7 @@ public class Camera2Instant {
             Log.i(TAG, "onOpened " + camera);
             cameraOpenCloseLock.release();
             currentCameraDevice = camera;
-            createCameraPreview(currentCameraDevice);
+            startCameraPreview(currentCameraDevice);
         }
 
         @Override
@@ -449,7 +462,7 @@ public class Camera2Instant {
         }
     };
 
-    private CameraCaptureSession.CaptureCallback captureStillCallback = new CameraCaptureSession.CaptureCallback() {
+    private CameraCaptureSession.CaptureCallback captureImageCallback = new CameraCaptureSession.CaptureCallback() {
         @Override
         public void onCaptureStarted(CameraCaptureSession session, CaptureRequest request, long timestamp, long frameNumber) {
             super.onCaptureStarted(session, request, timestamp, frameNumber);
@@ -485,6 +498,43 @@ public class Camera2Instant {
 
         @Override
         public void onCaptureBufferLost(CameraCaptureSession session, CaptureRequest request, Surface target, long frameNumber) {
+            super.onCaptureBufferLost(session, request, target, frameNumber);
+        }
+    };
+
+    private CameraCaptureSession.CaptureCallback captureVideoCallback = new CameraCaptureSession.CaptureCallback() {
+        @Override
+        public void onCaptureStarted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, long timestamp, long frameNumber) {
+            super.onCaptureStarted(session, request, timestamp, frameNumber);
+        }
+
+        @Override
+        public void onCaptureProgressed(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull CaptureResult partialResult) {
+            super.onCaptureProgressed(session, request, partialResult);
+        }
+
+        @Override
+        public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
+            super.onCaptureCompleted(session, request, result);
+        }
+
+        @Override
+        public void onCaptureFailed(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull CaptureFailure failure) {
+            super.onCaptureFailed(session, request, failure);
+        }
+
+        @Override
+        public void onCaptureSequenceCompleted(@NonNull CameraCaptureSession session, int sequenceId, long frameNumber) {
+            super.onCaptureSequenceCompleted(session, sequenceId, frameNumber);
+        }
+
+        @Override
+        public void onCaptureSequenceAborted(@NonNull CameraCaptureSession session, int sequenceId) {
+            super.onCaptureSequenceAborted(session, sequenceId);
+        }
+
+        @Override
+        public void onCaptureBufferLost(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull Surface target, long frameNumber) {
             super.onCaptureBufferLost(session, request, target, frameNumber);
         }
     };
@@ -582,6 +632,10 @@ public class Camera2Instant {
                         Arrays.asList(streamConfigurationMap.getOutputSizes(ImageFormat.JPEG)),
                         new CompareSizesByArea());
 
+                largestVideo = Collections.max(Arrays.asList(
+                        streamConfigurationMap.getOutputSizes(MediaRecorder.class)),
+                        new CompareSizesByArea());
+
                 //imageReader = ImageReader.newInstance(largestPic.getWidth(), largestPic.getHeight(),
                 //       ImageFormat.JPEG, /*maxImages*/1);
                 //imageReader.setOnImageAvailableListener(
@@ -590,7 +644,7 @@ public class Camera2Instant {
 
                 getCameraAbility(cameraId);
 
-                /*
+
                 Log.i(TAG, "streamConfigurationMap: " + streamConfigurationMap);
                 //format
                 Size[] surfaceTextureOutputSizes = streamConfigurationMap.getOutputSizes(SurfaceTexture.class);
@@ -601,8 +655,10 @@ public class Camera2Instant {
                 for(Size size : JPEGOutputSizes) {
                     Log.i(TAG, "Format:JPEG map width: " + size.getWidth() + " height: " + size.getHeight());
                 }
-
-                */
+                Size[] mediaSize = streamConfigurationMap.getOutputSizes(MediaRecorder.class);
+                for(Size size : mediaSize) {
+                    Log.i(TAG, "Format:video map width: " + size.getWidth() + " height: " + size.getHeight());
+                }
             }
 
         } catch (CameraAccessException e) {
@@ -666,8 +722,9 @@ public class Camera2Instant {
         }
     }
 
-    public void resumeCamera() {
+    public void resumeCamera(int cameraMode) {
         startBackgroundThread();
+        currentMode = cameraMode;
         imageReader = ImageReader.newInstance(largestPic.getWidth(), largestPic.getHeight(),
                 ImageFormat.JPEG, /*maxImages*/1);
         imageReader.setOnImageAvailableListener(
@@ -896,7 +953,7 @@ public class Camera2Instant {
         }
     }
 
-    private void createCameraPreview(CameraDevice device) {
+    private void startCameraPreview(CameraDevice device) {
         Log.i(TAG, "createCameraPreview");
         SurfaceTexture surfaceTexture = cameraTextureView.getSurfaceTexture();
 
@@ -1045,7 +1102,7 @@ public class Camera2Instant {
             stillCaptureRequestBuilder.set(CaptureRequest.JPEG_ORIENTATION, getOrientation(deviceOrientation));
 
             captureSession.stopRepeating();
-            captureSession.capture(stillCaptureRequestBuilder.build(), captureStillCallback, null);
+            captureSession.capture(stillCaptureRequestBuilder.build(), captureImageCallback, null);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }

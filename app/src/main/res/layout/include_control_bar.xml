@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@color/control_background">
+    <ImageButton
+        android:id="@+id/img_btn_capture"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_gravity="center"
+        android:background="@drawable/still_btn"
+        android:layout_centerVertical="true"
+        android:layout_centerHorizontal="true"
+        android:elevation="6dp"
+        android:src="@mipmap/ic_camera_white_48dp"/>
+
+    <ImageButton
+        android:id="@+id/img_btn_switch_camera"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:layout_marginEnd="24dp"
+        android:background="@drawable/control_btn"
+        android:elevation="6dp"
+        android:src="@mipmap/ic_camera_rear_white_48dp"/>
+
+    <ImageButton
+        android:id="@+id/img_btn_switch_capture"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_centerVertical="true"
+        android:layout_toStartOf="@+id/img_btn_switch_camera"
+        android:layout_marginEnd="4dp"
+        android:background="@drawable/control_btn"
+        android:elevation="6dp"
+        android:src="@mipmap/ic_videocam_white_48dp"/>
+
+    <ImageButton
+        android:id="@+id/img_view_thumbnail"
+        android:layout_width="96dp"
+        android:layout_height="96dp"
+        android:layout_alignParentStart="true"
+        android:layout_centerVertical="true"
+        android:layout_marginStart="24dp"
+        android:elevation="6dp"
+        android:src="@mipmap/ic_launcher" />
+
+</RelativeLayout>
