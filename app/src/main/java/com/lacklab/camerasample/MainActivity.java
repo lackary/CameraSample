@@ -1,8 +1,6 @@
 package com.lacklab.camerasample;
 
 import android.app.Activity;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.hardware.camera2.CameraCharacteristics;
 import android.os.Bundle;
 import android.util.Log;
@@ -12,11 +10,9 @@ import android.view.animation.RotateAnimation;
 import android.widget.ImageButton;
 
 import com.lacklab.camera2tool.control.Camera2Instant;
-import com.lacklab.camera2tool.module.ThumbnailInfo;
 import com.lacklab.camera2tool.utility.CameraTextureView;
 import com.lacklab.camera2tool.utility.DeviceOrientationListener;
 import com.lackary.camerasample.R;
-import com.lacklab.camera2tool.utility.MediaManager;
 
 public class MainActivity extends Activity implements View.OnClickListener, View.OnLongClickListener{
     private final String TAG = this.getClass().getSimpleName();
@@ -36,6 +32,8 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     private int fromRotation = 0;
 
     boolean currentFacing = true;
+
+    boolean isRecording = false;
 
     private void initView() {
         cameraTextureView = (CameraTextureView) findViewById(R.id.camera_preview);
@@ -156,7 +154,16 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         Log.i(TAG, "capture button click");
         switch (v.getId()) {
             case R.id.img_btn_capture:
-                cameraInstant.capture();
+                if (cameraInstant.getCurrentMode() == Camera2Instant.IMAGE_MODE) {
+                    cameraInstant.capture();
+                } else if (cameraInstant.getCurrentMode() == Camera2Instant.VIDEO_MODE){
+                    if(!isRecording) {
+                        cameraInstant.startRecording();
+                    } else {
+                        cameraInstant.stopRecording();
+                    }
+                }
+
                 break;
             case R.id.img_btn_switch_capture:
                 if (cameraInstant.getCurrentMode() == Camera2Instant.IMAGE_MODE) {

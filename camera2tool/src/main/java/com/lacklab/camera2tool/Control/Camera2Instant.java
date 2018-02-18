@@ -88,6 +88,8 @@ public class Camera2Instant {
 
     private String currentCameraId;
 
+    private String prefixName;
+
     private int currentMode = 1;
 
     private List<String> filePathList = new ArrayList<String>();
@@ -130,6 +132,11 @@ public class Camera2Instant {
      * The android.util.Size of camera preview.
      */
     private Size previewSize;
+
+    /**
+     *
+     */
+    private Size videoSize;
 
     /**
      * Camera state: Showing camera preview.
@@ -252,6 +259,27 @@ public class Camera2Instant {
         return currentMode;
     }
 
+    public String getPrefixName() {
+        return prefixName;
+    }
+
+    public void setPrefixName(String name) {
+        prefixName = name;
+    }
+
+    public String getVideoFile() {
+        return (prefixName == null?"":prefixName + "_") + System.currentTimeMillis() + ".mp4";
+    }
+
+    private void setUpMediaRecorder() throws IOException {
+        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+        mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
+        mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+        mediaRecorder.setOutputFile(cameraDir.getAbsolutePath() + getVideoFile());
+        mediaRecorder.prepare();
+
+    }
+
     private void setUpCameraPreview(int width, int height) {
 
         // Find out if we need to swap dimension to get the preview size relative to sensor
@@ -299,6 +327,9 @@ public class Camera2Instant {
             maxPreviewHeight = MAX_PREVIEW_HEIGHT;
         }
 
+        if (currentMode == VIDEO_MODE) {
+            videoSize = chooseVideoSize(streamConfigurationMap.getOutputSizes(MediaRecorder.class));
+        }
         // Danger, W.R.! Attempting to use too large a preview size could  exceed the camera
         // bus' bandwidth limitation, resulting in  previews but the storage of
         // garbage capture data.
@@ -715,6 +746,10 @@ public class Camera2Instant {
                 imageReader.close();
                 imageReader = null;
             }
+            if (null != mediaRecorder) {
+                mediaRecorder.release();
+                mediaRecorder = null;
+            }
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted while trying to lock camera closing.", e);
         } finally {
@@ -725,10 +760,15 @@ public class Camera2Instant {
     public void resumeCamera(int cameraMode) {
         startBackgroundThread();
         currentMode = cameraMode;
-        imageReader = ImageReader.newInstance(largestPic.getWidth(), largestPic.getHeight(),
-                ImageFormat.JPEG, /*maxImages*/1);
-        imageReader.setOnImageAvailableListener(
-                imageAvailableListener, backgroundHandler);
+        if (currentMode == VIDEO_MODE) {
+            mediaRecorder = new MediaRecorder();
+        } else {
+            imageReader = ImageReader.newInstance(largestPic.getWidth(), largestPic.getHeight(),
+                    ImageFormat.JPEG, /*maxImages*/1);
+            imageReader.setOnImageAvailableListener(
+                    imageAvailableListener, backgroundHandler);
+        }
+
         previewSize = new Size(cameraTextureView.getWidth(), cameraTextureView.getHeight());
         if (cameraTextureView.isAvailable()) {
             Log.i(TAG, "camera texture view was available ");
@@ -775,6 +815,24 @@ public class Camera2Instant {
         }
         return (ORIENTATIONS.get(fixOrientation) + sensorOrientation) % 360;
     }
+
+    /**
+     * In this sample, we choose a video size with 3x4 aspect ratio. Also, we don't use sizes
+     * larger than 1080p, since MediaRecorder cannot handle such a high-resolution video.
+     *
+     * @param choices The list of available sizes
+     * @return The video size
+     */
+    private Size chooseVideoSize(Size[] choices) {
+        for (Size size : choices) {
+            if (size.getWidth() == size.getHeight() * 4 / 3 && size.getWidth() <= 1080) {
+                return size;
+            }
+        }
+        Log.e(TAG, "Couldn't find any suitable video size");
+        return choices[choices.length - 1];
+    }
+
     /**
      * Given {@code choices} of {@code Size}s supported by a camera, choose the smallest one that
      * is at least as large as the respective texture view size, and that is at most as large as the
@@ -942,6 +1000,14 @@ public class Camera2Instant {
         lockFocus();
     }
 
+    public void startRecording() {
+
+    }
+
+    public void stopRecording() {
+
+    }
+
     public void setPictureOrientation(int orientation){
         this.deviceOrientation = orientation;
     }
@@ -951,6 +1017,10 @@ public class Camera2Instant {
             requestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
                     CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
         }
+    }
+
+    private void startPurePreview() {
+
     }
 
     private void startCameraPreview(CameraDevice device) {
