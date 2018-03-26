@@ -1224,21 +1224,9 @@ public class Camera2Instant {
 
             // Use the same AE and AF modes as the preview.
             stillCaptureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
-                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-            /*
-            CameraCaptureSession.CaptureCallback stillCaptureCallback
-                    = new CameraCaptureSession.CaptureCallback() {
-
-                @Override
-                public void onCaptureCompleted(@NonNull CameraCaptureSession session,
-                                               @NonNull CaptureRequest request,
-                                               @NonNull TotalCaptureResult result) {
-                    //showToast("Saved: " + mFile);
-                    Log.d(TAG, "still Capture completed");
-                    unlockFocus();
-                }
-            };
-            */
+                    CaptureRequest.CONTROL_AF_MODE_AUTO);
+            stillCaptureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
+                    CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
             // Orientation
             //int rotation = activity.getWindowManager().getDefaultDisplay().getRotation();
             stillCaptureRequestBuilder.set(CaptureRequest.JPEG_ORIENTATION, getOrientation(deviceOrientation));
