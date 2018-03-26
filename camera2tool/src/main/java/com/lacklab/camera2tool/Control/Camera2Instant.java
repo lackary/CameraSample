@@ -21,6 +21,7 @@ import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
+import android.media.MediaCodec;
 import android.media.MediaRecorder;
 import android.os.Environment;
 import android.os.Handler;
@@ -39,6 +40,7 @@ import android.widget.ImageButton;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
+import com.lacklab.camera2tool.module.Thumbnail;
 import com.lacklab.camera2tool.utility.CameraTextureView;
 
 import java.io.File;
@@ -76,7 +78,9 @@ public class Camera2Instant {
 
     public static final int VIDEO_MODE = 2;
 
-    private Activity cameraActivity;
+    public static boolean isRecordingVideo = false;
+
+    protected Activity cameraActivity;
 
     private HandlerThread backgroundThread;
 
@@ -101,7 +105,7 @@ public class Camera2Instant {
 
     static {
         ORIENTATIONS.append(Surface.ROTATION_0, 0);
-        ORIENTATIONS.append(Surface.ROTATION_90, 90);
+        ORIENTATIONS.append(Surface.ROTATION_90, 0);
         ORIENTATIONS.append(Surface.ROTATION_180, 180);
         ORIENTATIONS.append(Surface.ROTATION_270, 270);
     }
@@ -251,12 +255,18 @@ public class Camera2Instant {
         void onImageByte(byte[] bytes);
     }
 
+    public Thumbnail thumbnail;
+
     public File getCameraDir() {
         return cameraDir;
     }
 
     public int getCurrentMode() {
         return currentMode;
+    }
+
+    public void setCurrentMode(int mode) {
+        currentMode = mode;
     }
 
     public String getPrefixName() {
@@ -268,14 +278,19 @@ public class Camera2Instant {
     }
 
     public String getVideoFile() {
-        return (prefixName == null?"":prefixName + "_") + System.currentTimeMillis() + ".mp4";
+        return (prefixName == null? "" : prefixName + "_") + System.currentTimeMillis() + ".mp4";
     }
 
     private void setUpMediaRecorder() throws IOException {
         mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
         mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
         mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-        mediaRecorder.setOutputFile(cameraDir.getAbsolutePath() + getVideoFile());
+        mediaRecorder.setOutputFile(cameraDir.getAbsolutePath() + "/" + getVideoFile());
+        mediaRecorder.setVideoEncodingBitRate(10000000);
+        mediaRecorder.setVideoFrameRate(30);
+        mediaRecorder.setVideoSize(largestVideo.getWidth(), largestVideo.getHeight());
+        mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+        mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
         mediaRecorder.prepare();
 
     }
@@ -390,6 +405,7 @@ public class Camera2Instant {
             cameraOpenCloseLock.release();
             currentCameraDevice = camera;
             startCameraPreview(currentCameraDevice);
+
         }
 
         @Override
@@ -581,10 +597,39 @@ public class Camera2Instant {
             captureSession = session;
             try {
                 previewRequest = previewRequestBuilder.build();
-                captureSession.setRepeatingRequest(previewRequest, capturePreviewCallback, backgroundHandler);
+                if (currentMode == IMAGE_MODE) {
+                    captureSession.setRepeatingRequest(previewRequest, capturePreviewCallback, backgroundHandler);
+                } else if (currentMode == VIDEO_MODE) {
+                    captureSession.setRepeatingRequest(previewRequest, null, backgroundHandler);
+                }
+
             } catch (CameraAccessException e) {
                 Log.i(TAG, "captureSessionStateCallback CameraAccessException: " + e);
             }
+        }
+
+        @Override
+        public void onConfigureFailed(CameraCaptureSession session) {
+            Log.i(TAG, "captureSessionStateCallback onConfigureFailed: " + session);
+        }
+    };
+
+    private CameraCaptureSession.StateCallback recordSessionStateCallback =  new CameraCaptureSession.StateCallback() {
+
+        @Override
+        public void onConfigured(CameraCaptureSession session) {
+            Log.i(TAG, "captureSessionStateCallback onConfigured");
+            if (currentCameraDevice == null) {
+                return;
+            }
+            captureSession = session;
+            try {
+                captureSession.setRepeatingRequest(previewRequest, null, backgroundHandler);
+            } catch (CameraAccessException e) {
+                Log.i(TAG, "captureSessionStateCallback CameraAccessException: " + e);
+            }
+            isRecordingVideo = true;
+            mediaRecorder.start();
         }
 
         @Override
@@ -619,6 +664,7 @@ public class Camera2Instant {
 
     public void setCameraActivity(Activity cameraActivity) {
         this.cameraActivity = cameraActivity;
+        thumbnail = (Thumbnail) cameraActivity;
     }
 
     public void setCameraTextureView(CameraTextureView textureView ) {
@@ -757,9 +803,8 @@ public class Camera2Instant {
         }
     }
 
-    public void resumeCamera(int cameraMode) {
+    public void resumeCamera() {
         startBackgroundThread();
-        currentMode = cameraMode;
         if (currentMode == VIDEO_MODE) {
             mediaRecorder = new MediaRecorder();
         } else {
@@ -798,7 +843,7 @@ public class Camera2Instant {
         // For Nexus 7 the orientation of front camera was 270
         // For Nexus 7 the orientation of back camera was 90
         Log.i(TAG, "ORIENTATIONS: " + ORIENTATIONS.get(rotation));
-        int fixOrientation = -1;
+        int fixOrientation;
         if (sensorOrientation == 270) {
             switch (rotation) {
                 case Surface.ROTATION_90:
@@ -1001,11 +1046,37 @@ public class Camera2Instant {
     }
 
     public void startRecording() {
+        captureSession.close();
+        Log.i(TAG, "startRecording");
+        try {
+            List<Surface> surfaces = new ArrayList<>();
+            previewRequestBuilder = currentCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
+            cameraTextureView.getSurfaceTexture().setDefaultBufferSize(previewSize.getWidth(), previewSize.getHeight());
+            Surface previewSurface = new Surface(cameraTextureView.getSurfaceTexture());
+            surfaces.add(previewSurface);
+            previewRequestBuilder.addTarget(previewSurface);
+
+            setUpMediaRecorder();
+            Surface recorderSurface = mediaRecorder.getSurface();
+            surfaces.add(recorderSurface);
+            MediaCodec mediaCodec = MediaCodec.createByCodecName("test");
+            previewRequestBuilder.addTarget(recorderSurface);
+
+            currentCameraDevice.createCaptureSession(surfaces, recordSessionStateCallback, backgroundHandler);
+
+        } catch (IOException | CameraAccessException e) {
+            e.printStackTrace();
+        }
+
+
 
     }
 
     public void stopRecording() {
-
+        isRecordingVideo = false;
+        mediaRecorder.stop();
+        mediaRecorder.reset();
+        startCameraPreview(currentCameraDevice);
     }
 
     public void setPictureOrientation(int orientation){
@@ -1017,10 +1088,6 @@ public class Camera2Instant {
             requestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
                     CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
         }
-    }
-
-    private void startPurePreview() {
-
     }
 
     private void startCameraPreview(CameraDevice device) {
@@ -1035,7 +1102,12 @@ public class Camera2Instant {
             previewRequestBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             previewRequestBuilder.addTarget(previewSurface);
             // Here, we create a CameraCaptureSession for camera preview.
-            device.createCaptureSession(Arrays.asList(previewSurface, imageReader.getSurface()), captureSessionStateCallback, null);
+            if (currentMode == IMAGE_MODE) {
+                device.createCaptureSession(Arrays.asList(previewSurface, imageReader.getSurface()), captureSessionStateCallback, null);
+            } else if (currentMode == VIDEO_MODE) {
+                device.createCaptureSession(Collections.singletonList(previewSurface), captureSessionStateCallback, backgroundHandler);
+            }
+
         } catch (CameraAccessException e) {
             Log.e(TAG, "createCameraPreview CameraAccessException: " + e);
             e.printStackTrace();
@@ -1240,6 +1312,8 @@ public class Camera2Instant {
          */
         private final File file;
 
+        private Bitmap bitmap;
+
         public ImageSaver(Image image, File file) {
             this.image = image;
             this.file = file;
@@ -1256,12 +1330,14 @@ public class Camera2Instant {
             try {
                 output = new FileOutputStream(file);
                 output.write(bytes);
+                bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, null);
                 if(imageListener != null) {
                     imageListener.onImageByte(bytes);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
+                Camera2Instant.getInstance().thumbnail.onShowThumbnail(bitmap);
                 image.close();
                 if (null != output) {
                     try {

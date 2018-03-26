@@ -1,7 +1,10 @@
 package com.lacklab.camerasample;
 
 import android.app.Activity;
+import android.graphics.Bitmap;
 import android.hardware.camera2.CameraCharacteristics;
+import android.media.Image;
+import android.media.ThumbnailUtils;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Surface;
@@ -12,9 +15,11 @@ import android.widget.ImageButton;
 import com.lacklab.camera2tool.control.Camera2Instant;
 import com.lacklab.camera2tool.utility.CameraTextureView;
 import com.lacklab.camera2tool.utility.DeviceOrientationListener;
+import com.lacklab.camera2tool.module.Thumbnail;
 import com.lackary.camerasample.R;
 
-public class MainActivity extends Activity implements View.OnClickListener, View.OnLongClickListener{
+public class MainActivity extends Activity implements View.OnClickListener, View.OnLongClickListener
+        , Thumbnail {
     private final String TAG = this.getClass().getSimpleName();
 
     private Camera2Instant cameraInstant;
@@ -32,8 +37,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     private int fromRotation = 0;
 
     boolean currentFacing = true;
-
-    boolean isRecording = false;
+    public Bitmap bitmapthumbnail;
 
     private void initView() {
         cameraTextureView = (CameraTextureView) findViewById(R.id.camera_preview);
@@ -124,8 +128,8 @@ public class MainActivity extends Activity implements View.OnClickListener, View
             }
         };
 
-        //cameraInstant.getFiles();
-        //cameraInstant.setThumbnail();
+        cameraInstant.getFiles();
+        cameraInstant.setThumbnail();
         //MediaManager fileManager = new MediaManager(this.getApplicationContext());
         //ThumbnailInfo thumbnailInfo = fileManager.getLastThumbnailInfo(cameraInstant.getCameraDir());
         //Bitmap bitmap = BitmapFactory.decodeFile(thumbnailInfo.getPath());
@@ -139,7 +143,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         Log.i(TAG, "onResume");
         super.onResume();
         setView();
-        cameraInstant.resumeCamera(cameraInstant.getCurrentMode());
+        cameraInstant.resumeCamera();
     }
 
     @Override
@@ -157,7 +161,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                 if (cameraInstant.getCurrentMode() == Camera2Instant.IMAGE_MODE) {
                     cameraInstant.capture();
                 } else if (cameraInstant.getCurrentMode() == Camera2Instant.VIDEO_MODE){
-                    if(!isRecording) {
+                    if(!Camera2Instant.isRecordingVideo) {
                         cameraInstant.startRecording();
                     } else {
                         cameraInstant.stopRecording();
@@ -169,17 +173,19 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                 if (cameraInstant.getCurrentMode() == Camera2Instant.IMAGE_MODE) {
                     modeImage.setImageResource(R.mipmap.ic_camera_alt_white_48dp);
                     cameraInstant.closeCamera();
-                    cameraInstant.resumeCamera(Camera2Instant.VIDEO_MODE);
+                    cameraInstant.setCurrentMode(Camera2Instant.VIDEO_MODE);
+                    cameraInstant.resumeCamera();
                 } else if (cameraInstant.getCurrentMode() == Camera2Instant.VIDEO_MODE) {
                     modeImage.setImageResource(R.mipmap.ic_videocam_white_48dp);
                     cameraInstant.closeCamera();
-                    cameraInstant.resumeCamera(Camera2Instant.IMAGE_MODE);
+                    cameraInstant.setCurrentMode(Camera2Instant.IMAGE_MODE);
+                    cameraInstant.resumeCamera();
                 }
                 break;
             case R.id.img_btn_switch_camera:
                 cameraInstant.closeCamera();
                 cameraInstant.initCamera(currentFacing?CameraCharacteristics.LENS_FACING_FRONT:CameraCharacteristics.LENS_FACING_BACK);
-                cameraInstant.resumeCamera(cameraInstant.getCurrentMode());
+                cameraInstant.resumeCamera();
                 currentFacing = !currentFacing;
                 break;
         }
@@ -196,4 +202,15 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         return false;
     }
 
+    @Override
+    public void onShowThumbnail(Bitmap bitmap) {
+        bitmapthumbnail = ThumbnailUtils.extractThumbnail(bitmap, 128,128);
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                thumbnailImgBtn.setImageBitmap(bitmapthumbnail);
+            }
+        });
+        Log.i(TAG, "onShowThumbnail");
+    }
 }
