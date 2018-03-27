@@ -1,6 +1,7 @@
 package com.lacklab.camerasample;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.hardware.camera2.CameraCharacteristics;
 import android.media.Image;
@@ -11,12 +12,17 @@ import android.view.Surface;
 import android.view.View;
 import android.view.animation.RotateAnimation;
 import android.widget.ImageButton;
+import android.graphics.BitmapFactory;
 
 import com.lacklab.camera2tool.control.Camera2Instant;
 import com.lacklab.camera2tool.utility.CameraTextureView;
 import com.lacklab.camera2tool.utility.DeviceOrientationListener;
 import com.lacklab.camera2tool.module.Thumbnail;
+import com.lacklab.camera2tool.module.ThumbnailInfo;
+import com.lacklab.camera2tool.utility.MediaManager;
 import com.lackary.camerasample.R;
+
+import java.io.File;
 
 public class MainActivity extends Activity implements View.OnClickListener, View.OnLongClickListener
         , Thumbnail {
@@ -37,7 +43,9 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     private int fromRotation = 0;
 
     boolean currentFacing = true;
-    public Bitmap bitmapthumbnail;
+    public Bitmap bitmapThumbnail;
+    public String filePath;
+
 
     private void initView() {
         cameraTextureView = (CameraTextureView) findViewById(R.id.camera_preview);
@@ -128,12 +136,13 @@ public class MainActivity extends Activity implements View.OnClickListener, View
             }
         };
 
-        cameraInstant.getFiles();
-        cameraInstant.setThumbnail();
-        //MediaManager fileManager = new MediaManager(this.getApplicationContext());
-        //ThumbnailInfo thumbnailInfo = fileManager.getLastThumbnailInfo(cameraInstant.getCameraDir());
-        //Bitmap bitmap = BitmapFactory.decodeFile(thumbnailInfo.getPath());
-        //thumbnailImgBtn.setImageBitmap(bitmap);
+        //cameraInstant.getFiles();
+        //cameraInstant.setThumbnail();
+        MediaManager fileManager = new MediaManager(this.getApplicationContext());
+        ThumbnailInfo thumbnailInfo = fileManager.getLastThumbnailInfo(cameraInstant.getCameraDir());
+        this.filePath = thumbnailInfo.getPath();
+        Bitmap bitmap = BitmapFactory.decodeFile(thumbnailInfo.getPath());
+        thumbnailImgBtn.setImageBitmap(bitmap);
         deviceOrientationListener.enable();
 
     }
@@ -188,6 +197,14 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                 cameraInstant.resumeCamera();
                 currentFacing = !currentFacing;
                 break;
+            case R.id.img_view_thumbnail:
+                if (this.filePath != null) {
+                    Intent intent = new Intent();
+                    intent.setClass(this, PhotoActivity.class);
+                    intent.putExtra("filePath", this.filePath);
+                    startActivity(intent);
+                }
+                break;
         }
     }
 
@@ -203,12 +220,13 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     }
 
     @Override
-    public void onShowThumbnail(Bitmap bitmap) {
-        bitmapthumbnail = ThumbnailUtils.extractThumbnail(bitmap, 128,128);
+    public void onShowThumbnail(Bitmap bitmap, String filePath) {
+        this.filePath = filePath;
+        bitmapThumbnail = ThumbnailUtils.extractThumbnail(bitmap, 128,128);
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                thumbnailImgBtn.setImageBitmap(bitmapthumbnail);
+                thumbnailImgBtn.setImageBitmap(bitmapThumbnail);
             }
         });
         Log.i(TAG, "onShowThumbnail");

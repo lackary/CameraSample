@@ -1325,7 +1325,7 @@ public class Camera2Instant {
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
-                Camera2Instant.getInstance().thumbnail.onShowThumbnail(bitmap);
+                Camera2Instant.getInstance().thumbnail.onShowThumbnail(bitmap, file.getPath());
                 image.close();
                 if (null != output) {
                     try {
