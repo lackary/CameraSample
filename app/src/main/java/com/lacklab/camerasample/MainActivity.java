@@ -1,19 +1,26 @@
 package com.lacklab.camerasample;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.hardware.camera2.CameraCharacteristics;
 import android.media.Image;
 import android.media.ThumbnailUtils;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.Surface;
 import android.view.View;
 import android.view.animation.RotateAnimation;
+import android.view.ViewAnimationUtils;
 import android.widget.ImageButton;
 import android.graphics.BitmapFactory;
+import android.animation.Animator;
+import android.widget.VideoView;
 
+import com.bumptech.glide.Glide;
 import com.lacklab.camera2tool.control.Camera2Instant;
 import com.lacklab.camera2tool.utility.CameraTextureView;
 import com.lacklab.camera2tool.utility.DeviceOrientationListener;
@@ -46,6 +53,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     public Bitmap bitmapThumbnail;
     public String filePath;
 
+    protected Context context;
 
     private void initView() {
         cameraTextureView = (CameraTextureView) findViewById(R.id.camera_preview);
@@ -69,7 +77,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         setContentView(R.layout.activity_main);
 
         initView();
-
+        context = getApplicationContext();
         //camera setting
         cameraInstant = Camera2Instant.getInstance();
         cameraInstant.setCameraActivity(this);
@@ -199,10 +207,18 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                 break;
             case R.id.img_view_thumbnail:
                 if (this.filePath != null) {
-                    Intent intent = new Intent();
-                    intent.setClass(this, PhotoActivity.class);
-                    intent.putExtra("filePath", this.filePath);
-                    startActivity(intent);
+                    String extension = filePath.substring(filePath.lastIndexOf("."));
+                    if (extension.equals(".mp4")) {
+                        Intent intent = new Intent();
+                        intent.setClass(this, VideoActivity.class);
+                        intent.putExtra("filePath", this.filePath);
+                        startActivity(intent);
+                    } else if (extension.equals(".jpg")) {
+                        Intent intent = new Intent();
+                        intent.setClass(this, PhotoActivity.class);
+                        intent.putExtra("filePath", this.filePath);
+                        startActivity(intent);
+                    }
                 }
                 break;
         }
@@ -222,13 +238,20 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     @Override
     public void onShowThumbnail(Bitmap bitmap, String filePath) {
         this.filePath = filePath;
-        bitmapThumbnail = ThumbnailUtils.extractThumbnail(bitmap, 128,128);
+        String extension = filePath.substring(filePath.lastIndexOf("."));
+        if (extension.equals(".mp4")) {
+            bitmapThumbnail = ThumbnailUtils.createVideoThumbnail(filePath, MediaStore.Video.Thumbnails.MINI_KIND);
+        } else if (extension.equals(".jpg")) {
+            bitmapThumbnail = ThumbnailUtils.extractThumbnail(bitmap, 128,128);
+        }
+
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                thumbnailImgBtn.setImageBitmap(bitmapThumbnail);
+                Glide.with(context).load(bitmapThumbnail).into(thumbnailImgBtn);
             }
         });
+
         Log.i(TAG, "onShowThumbnail");
     }
 }

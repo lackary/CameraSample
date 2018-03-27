@@ -230,6 +230,9 @@ public class Camera2Instant {
 
     private File cameraDir;
 
+    private String videoFilePath;
+    private String photoFilePath;
+
     /**
      * the streamConfiguration of Camera Device
      */
@@ -282,15 +285,17 @@ public class Camera2Instant {
     }
 
     private void setUpMediaRecorder() throws IOException {
+        videoFilePath = cameraDir.getAbsolutePath() + "/" + getVideoFile();
         mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
         mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
         mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-        mediaRecorder.setOutputFile(cameraDir.getAbsolutePath() + "/" + getVideoFile());
+        mediaRecorder.setOutputFile(videoFilePath);
         mediaRecorder.setVideoEncodingBitRate(10000000);
         mediaRecorder.setVideoFrameRate(30);
         mediaRecorder.setVideoSize(largestVideo.getWidth(), largestVideo.getHeight());
         mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
         mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+        mediaRecorder.setOrientationHint(getOrientation(deviceOrientation));
         mediaRecorder.prepare();
 
     }
@@ -624,6 +629,8 @@ public class Camera2Instant {
             }
             captureSession = session;
             try {
+                previewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+                previewRequest = previewRequestBuilder.build();
                 captureSession.setRepeatingRequest(previewRequest, null, backgroundHandler);
             } catch (CameraAccessException e) {
                 Log.i(TAG, "captureSessionStateCallback CameraAccessException: " + e);
@@ -708,11 +715,12 @@ public class Camera2Instant {
                 largestPic = Collections.max(
                         Arrays.asList(streamConfigurationMap.getOutputSizes(ImageFormat.JPEG)),
                         new CompareSizesByArea());
-
+                /*
                 largestVideo = Collections.max(Arrays.asList(
                         streamConfigurationMap.getOutputSizes(MediaRecorder.class)),
                         new CompareSizesByArea());
-
+                */
+                largestVideo = new Size(1024, 768);
                 //imageReader = ImageReader.newInstance(largestPic.getWidth(), largestPic.getHeight(),
                 //       ImageFormat.JPEG, /*maxImages*/1);
                 //imageReader.setOnImageAvailableListener(
@@ -813,8 +821,13 @@ public class Camera2Instant {
             imageReader.setOnImageAvailableListener(
                     imageAvailableListener, backgroundHandler);
         }
+        if (currentMode == VIDEO_MODE) {
+            previewSize = new Size(1024, 768);
+        } else {
+            previewSize = new Size(cameraTextureView.getWidth(), cameraTextureView.getHeight());
+        }
 
-        previewSize = new Size(cameraTextureView.getWidth(), cameraTextureView.getHeight());
+
         if (cameraTextureView.isAvailable()) {
             Log.i(TAG, "camera texture view was available ");
             openCamera(cameraTextureView.getWidth(), cameraTextureView.getHeight());
@@ -1059,7 +1072,7 @@ public class Camera2Instant {
             setUpMediaRecorder();
             Surface recorderSurface = mediaRecorder.getSurface();
             surfaces.add(recorderSurface);
-            MediaCodec mediaCodec = MediaCodec.createByCodecName("test");
+            //MediaCodec mediaCodec = MediaCodec.createByCodecName("test");
             previewRequestBuilder.addTarget(recorderSurface);
 
             currentCameraDevice.createCaptureSession(surfaces, recordSessionStateCallback, backgroundHandler);
@@ -1073,10 +1086,19 @@ public class Camera2Instant {
     }
 
     public void stopRecording() {
+        try {
+            captureSession.stopRepeating();
+            captureSession.abortCaptures();
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+
         isRecordingVideo = false;
         mediaRecorder.stop();
         mediaRecorder.reset();
         startCameraPreview(currentCameraDevice);
+
+        Camera2Instant.getInstance().thumbnail.onShowThumbnail(null, videoFilePath);
     }
 
     public void setPictureOrientation(int orientation){
