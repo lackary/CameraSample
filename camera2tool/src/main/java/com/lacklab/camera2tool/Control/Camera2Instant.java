@@ -631,6 +631,7 @@ public class Camera2Instant {
             try {
                 previewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
                 previewRequest = previewRequestBuilder.build();
+                //necessary by recording
                 captureSession.setRepeatingRequest(previewRequest, null, backgroundHandler);
             } catch (CameraAccessException e) {
                 Log.i(TAG, "captureSessionStateCallback CameraAccessException: " + e);
@@ -685,7 +686,6 @@ public class Camera2Instant {
         try {
             for(String cameraId : cameraManager.getCameraIdList()) {
                 Log.i(TAG, "Camera Id: " + cameraId);
-
                 CameraCharacteristics cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId);
                 Integer facing = cameraCharacteristics.get(CameraCharacteristics.LENS_FACING);
                 /*
