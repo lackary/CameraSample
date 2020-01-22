@@ -22,6 +22,8 @@
         android:layout_marginEnd="24dp"
         android:background="@drawable/control_btn"
         android:elevation="6dp"
+        android:scaleType="fitCenter"
+        android:padding="8dp"
         android:src="@mipmap/ic_camera_rear_white_48dp"/>
 
     <ImageButton
@@ -30,7 +32,7 @@
         android:layout_height="56dp"
         android:layout_centerVertical="true"
         android:layout_toStartOf="@+id/img_btn_switch_camera"
-        android:layout_marginEnd="4dp"
+        android:layout_marginEnd="8dp"
         android:background="@drawable/control_btn"
         android:elevation="6dp"
         android:src="@mipmap/ic_videocam_white_48dp"/>
